@@ -42,7 +42,11 @@
 ###############################################################################
 
 
-add_executable(raja-pi
-  pi.cxx)
+if (RAJA_ENABLE_CUDA)
 
-target_link_libraries(raja-pi RAJA)
+else()
+  add_executable(raja-pi
+    pi.cxx)
+  target_link_libraries(raja-pi RAJA)
+endif()
+

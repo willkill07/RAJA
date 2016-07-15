@@ -43,6 +43,7 @@
 
 add_definitions(-DRAJA_ENABLE_NESTED)
 
+
 if (RAJA_ENABLE_CUDA)
   cuda_add_executable(CPUtraversal-test.exe
     main-traversal.cxx
@@ -54,6 +55,14 @@ if (RAJA_ENABLE_CUDA)
 
   cuda_add_executable(CPUnested-test.exe
     main-nested.cxx)
+
+  cuda_add_executable(indexset-tests
+    test-indexsets.cxx
+    buildIndexSet.cxx)
+
+  cuda_add_executable(traversal-tests
+    test-traversals.cxx
+    buildIndexSet.cxx)
 
   if(RAJA_ENABLE_OPENMP)
       cuda_add_executable(CPUnested_reduce-test.exe
@@ -71,6 +80,14 @@ else()
   
   add_executable(CPUnested-test.exe
     main-nested.cxx)
+
+  add_executable(indexset-tests
+    test-indexsets.cxx
+    buildIndexSet.cxx)
+
+  add_executable(traversal-tests
+    test-traversals.cxx
+    buildIndexSet.cxx)
 
   if(RAJA_ENABLE_OPENMP)
     add_executable(CPUnested_reduce-test.exe
@@ -93,18 +110,12 @@ if(RAJA_ENABLE_OPENMP)
       CPUnested_reduce-test.exe)
 endif()
 
-add_executable(indexset-tests
-  test-indexsets.cxx
-  buildIndexSet.cxx)
 
 add_test(indexset-test
   indexset-tests)
 
 target_link_libraries(indexset-tests RAJA gtest gtest_main ${CMAKE_THREAD_LIBS_INIT})
 
-add_executable(traversal-tests
-  test-traversals.cxx
-  buildIndexSet.cxx)
 
 add_test(traversal-test
   traversal-tests)
