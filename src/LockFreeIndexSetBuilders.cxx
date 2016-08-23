@@ -507,26 +507,21 @@ void buildLockFreeBlockedColorIndexset(RAJA::IndexSet& iset,
       for (int i=0; i<numWorkset; ++i) {
          int begin = end ;
          end = worksetDelim[i] ;
-         bool isRange = true ;
-         for (int j=begin+1; j<end; ++j) {
-            if (workset[j-1]+1 != workset[j]) {
-               isRange = false ;
-               break ;
-            }
+         iset.push_back( RAJA::ListSegment( &workset[begin], end-begin) );
+         printf("segment %d\n", i) ;
+         for (int j=begin; j<end; ++j) {
+            printf("%d", workset[j]) ;
          }
-         if (isRange) {
-            iset.push_back( RAJA::RangeSegment( workset[begin], 
-                                                  workset[end-1]+1) ) ;
-         }
-         else {
-            iset.push_back( RAJA::ListSegment( &workset[begin], end-begin) );
-            // printf("segment %d\n", i) ;
-            // for (int j=begin; j<end; ++j) {
-            //    printf("%d\n", workset[j]) ;
-            // }
-         }
+         printf("\n") ;
       }
    }
+   struct ISinfo {
+      int numEntity ;
+   } *info ;
+   info = new ISinfo ;
+   info->numEntity = numEntity ;
+   
+   iset.setPrivate(info) ;
 
    delete [] isMarked ;
    delete [] worksetDelim ;

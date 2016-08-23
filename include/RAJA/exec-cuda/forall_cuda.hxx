@@ -77,6 +77,94 @@ namespace RAJA
 //
 //////////////////////////////////////////////////////////////////////
 //
+
+/* ----------------------------------------------------------------- */
+/*!
+ ******************************************************************************
+ *
+ * \brief  CUDA kernal forall template for indirection array.
+ *
+ ******************************************************************************
+ */
+template <typename Iterator, typename LOOP_BODY>
+__global__ void forall_cuda_kernel_block(LOOP_BODY loop_body,
+                                   const Iterator idx,
+                                   Index_type length)
+{
+  Index_type ii = blockDim.x * idx[blockIdx.x]  + threadIdx.x;
+  if (ii < length) {
+    loop_body(ii);
+  }
+}
+
+#if 0
+template <size_t BLOCK_SIZE, bool Async, typename Iterable, typename LOOP_BODY>
+RAJA_INLINE void forall(cuda_exec_asyc<BLOCK_SIZE, Async>,
+                        Iterable&& iter,
+                        LOOP_BODY loop_body)
+{
+  auto begin = std::begin(iter);
+  auto end = std::end(iter);
+  Index_type len = std::distance(begin, end);
+
+  size_t gridSize = (len + BLOCK_SIZE - 1) / BLOCK_SIZE;
+
+  RAJA_FT_BEGIN;
+
+  forall_cuda_kernel_block<<<gridSize, BLOCK_SIZE>>>(std::move(loop_body),
+                                               std::move(begin),
+                                               len, );
+  cudaErrchk(cudaPeekAtLastError());
+  if (!Async) {
+    cudaErrchk(cudaDeviceSynchronize());
+  }
+
+  RAJA_FT_END;
+}
+#endif
+
+/*!
+ ******************************************************************************
+ *
+ * \brief  Sequential iteration over segments of index set and
+ *         CUDA execution for segments.
+ *
+ ******************************************************************************
+ */
+template <size_t BLOCK_SIZE, typename LOOP_BODY>
+RAJA_INLINE void forall(IndexSet::ExecPolicy<simd_exec, cuda_exec<BLOCK_SIZE>>,
+                        const IndexSet& iset,
+                        LOOP_BODY loop_body)
+{
+  int num_seg = iset.getNumSegments();
+  for (int isi = 0; isi < num_seg; ++isi) {
+    const IndexSetSegInfo* seg_info = iset.getSegmentInfo(isi);
+    const BaseSegment* iseg = seg_info->getSegment();
+    const ListSegment* tseg = static_cast<const ListSegment*>(iseg);
+    struct { int numEntity ; } *isInfo = iset.getPrivate() ;
+    auto begin = std::begin(*tseg);
+    auto end = std::end(*tseg);
+    Index_type len = std::distance(begin, end);
+
+    size_t gridSize = len ;
+
+    RAJA_FT_BEGIN;
+
+    forall_cuda_kernel_block<<<gridSize, 32>>>(std::move(loop_body),
+                                               std::move(begin),
+                                               isInfo->numEntity );
+    // cudaErrchk(cudaPeekAtLastError());
+
+    RAJA_FT_END;
+
+  }  // iterate over segments of index set
+
+  cudaErrchk(cudaPeekAtLastError());
+  cudaErrchk(cudaDeviceSynchronize());
+}
+
+/* ----------------------------------------------------------------- */
+
 /*!
  ******************************************************************************
  *
