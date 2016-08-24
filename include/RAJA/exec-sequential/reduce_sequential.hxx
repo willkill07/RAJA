@@ -64,6 +64,8 @@
 
 #include "RAJA/MemUtils_CPU.hxx"
 
+#include "RAJA/internal/reduction_types.hxx"
+
 namespace RAJA
 {
 
@@ -76,8 +78,77 @@ namespace RAJA
  *
  ******************************************************************************
  */
+
+  template <typename Reducer, typename T>
+  class UnaryReducer<seq_reduce, Reducer, T>
+  {
+    explicit UnaryReducer(type init_val = Reducer<T>::init())
+      {
+        m_is_copy = false;
+        m_reduced_val = init_val;
+        m_myID = getCPUReductionId();
+        m_blockdata = getCPUReductionMemBlock(m_myID);
+        m_blockdata[0] = init_val;
+      }
+
+    //
+    // Copy ctor.
+    //
+    UnaryReducer(const UnaryReducer<seq_reduce, Reducer, T>& other)
+      {
+        *this = other;
+        m_is_copy = true;
+      }
+
+    //
+    // Destruction releases the shared memory block chunk for reduction id
+    // and id itself for others to use.
+    //
+    ~UnaryReducer<seq_reduce, Reducer, T>()
+      {
+        if (!m_is_copy) {
+          releaseCPUReductionId(m_myID);
+        }
+      }
+
+  //
+  // Operator that returns reduced min value.
+  //
+  operator T() {
+    m_reduced_val = Reducer<T>::apply (m_reduced_val, static_cast<T>(m_blockdata[0]));
+    return m_reduced_val;
+  }
+
+  //
+  // Method that returns reduced min value.
+  //
+  T get() { return operator T(); }
+
+  //
+  // Method that updates min value.
+  //
+  UnaryReducer<seq_reduce, Reducer, T> apply(T val) const
+  {
+        m_blockdata[0] = Reducer<T::apply (static_cast<T>(m_blockdata[0]), val);
+    return *this;
+  }
+
+private:
+  //
+  // Default ctor is declared private and not implemented.
+  //
+  UnaryReducer<seq_reduce, Reducer T>();
+
+  bool m_is_copy;
+  int m_myID;
+
+  T m_reduced_val;
+
+  CPUReductionBlockDataType* m_blockdata;
+  };
+
 template <typename T>
-class ReduceMin<seq_reduce, T>
+class ReduceMin<seq_reduce, T> : public UnaryReducer<seq_reduce, RAJA::internal::Reduction::Min, T>
 {
 public:
   //
