@@ -60,8 +60,6 @@
 //
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
-#include <cassert>
-
 #include "RAJA/int_datatypes.hxx"
 
 #include "RAJA/reducers.hxx"
@@ -70,11 +68,15 @@
 
 #include "RAJA/exec-cuda/raja_cudaerrchk.hxx"
 
+#include <cuda.h>
+
 
 namespace RAJA
 {
 
-
+// unnamed namespace to encapsulate helper functions
+namespace
+{
 /*!
  ******************************************************************************
  *
@@ -82,34 +84,23 @@ namespace RAJA
  *
  ******************************************************************************
  */
-#if 0
-__device__ __forceinline__ double shfl_xor(double var, int laneMask)
-{
-  int lo = __shfl_xor(__double2loint(var), laneMask);
-  int hi = __shfl_xor(__double2hiint(var), laneMask);
-  return __hiloint2double(hi, lo);
-}
-#else
 template<typename T>
 __device__ __forceinline__ T shfl_xor(T var, int laneMask)
 {
-  const int uint_sizeof_T = 
-      (sizeof(T) + sizeof(unsigned int) - 1) / sizeof(unsigned int);
+  const int int_sizeof_T = 
+      (sizeof(T) + sizeof(int) - 1) / sizeof(int);
   union {
     T var;
-    unsigned int arr[uint_sizeof_T];
+    int arr[int_sizeof_T];
   } Tunion;
   Tunion.var = var;
 
-  for(int i = 0; i < uint_sizeof_T; ++i) {
+  for(int i = 0; i < int_sizeof_T; ++i) {
     Tunion.arr[i] = __shfl_xor(Tunion.arr[i], laneMask);
   }
   return Tunion.var;
 }
-#endif
 
-// The following atomic functions need to be outside of the RAJA namespace
-#include <cuda.h>
 
 //
 // Three different variants of min/max reductions can be run by choosing
@@ -130,24 +121,38 @@ __device__ __forceinline__ T shfl_xor(T var, int laneMask)
 #define double_to_ull(x) __double_as_longlong(x)
 #endif
 
+/*!
+ ******************************************************************************
+ *
+ * \brief Generics of atomic update methods used in reduction variables.
+ *
+ * The generic version just wraps the nvidia cuda atomics.
+ * Specializations implement other more atomics using atomic CAS.
+ *
+ ******************************************************************************
+ */
 template <typename T>
-__device__ inline void _atomicMin(T *address, T value)
+__device__ inline T _atomicMin(T *address, T value)
 {
-  atomicMin(address, value);
+  return atomicMin(address, value);
 }
 
 template <typename T>
-__device__ inline void _atomicMax(T *address, T value)
+__device__ inline T _atomicMax(T *address, T value)
 {
-  atomicMax(address, value);
+  return atomicMax(address, value);
 }
 
 template <typename T>
-__device__ inline void _atomicAdd(T *address, T value)
+__device__ inline T _atomicAdd(T *address, T value)
 {
-  atomicAdd(address, value);
+  return atomicAdd(address, value);
 }
 
+//
+// Template specializations for atomic update methods not defined by nvidia
+// cuda.
+//
 #if defined(RAJA_USE_ATOMIC_ONE)
 /*!
  ******************************************************************************
@@ -158,7 +163,7 @@ __device__ inline void _atomicAdd(T *address, T value)
  ******************************************************************************
  */
 template <>
-__device__ inline void _atomicMin(double *address, double value)
+__device__ inline double _atomicMin(double *address, double value)
 {
   double temp = *(reinterpret_cast<double volatile *>(address));
   if (temp > value) {
@@ -172,11 +177,13 @@ __device__ inline void _atomicMin(double *address, double value)
       oldval = readback;
       newval = double_to_ull(RAJA_MIN(ull_to_double(oldval), value));
     }
+    temp = ull_to_double(oldval);
   }
+  return temp;
 }
 ///
 template <>
-__device__ inline void _atomicMin(float *address, float value)
+__device__ inline float _atomicMin(float *address, float value)
 {
   float temp = *(reinterpret_cast<float volatile *>(address));
   if (temp > value) {
@@ -189,11 +196,13 @@ __device__ inline void _atomicMin(float *address, float value)
       oldval = readback;
       newval = __float_as_int(RAJA_MIN(__int_as_float(oldval), value));
     }
+    temp = __int_as_float(oldval);
   }
+  return temp;
 }
 ///
 template <>
-__device__ inline void _atomicMax(double *address, double value)
+__device__ inline double _atomicMax(double *address, double value)
 {
   double temp = *(reinterpret_cast<double volatile *>(address));
   if (temp < value) {
@@ -207,11 +216,13 @@ __device__ inline void _atomicMax(double *address, double value)
       oldval = readback;
       newval = double_to_ull(RAJA_MAX(ull_to_double(oldval), value));
     }
+    temp = ull_to_double(oldval);
   }
+  return temp;
 }
 ///
 template <>
-__device__ inline void _atomicMax(float *address, float value)
+__device__ inline float _atomicMax(float *address, float value)
 {
   float temp = *(reinterpret_cast<float volatile *>(address));
   if (temp < value) {
@@ -224,14 +235,17 @@ __device__ inline void _atomicMax(float *address, float value)
       oldval = readback;
       newval = __float_as_int(RAJA_MAX(__int_as_float(oldval), value));
     }
+    temp = __int_as_float(oldval);
   }
+  return temp;
 }
 #if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ >= 350
-/// don't specialize for 64-bit min/max if they exist
+// don't specialize for 64-bit min/max if they exist
 #else
-/// implement 64-bit min/max if they don't exist
+// implement 64-bit min/max if they don't exist
 template <>
-__device__ inline void _atomicMin(unsigned long long int *address,
+__device__ inline unsigned long long int _atomicMin(
+                                  unsigned long long int *address,
                                   unsigned long long int value)
 {
   unsigned long long int temp =
@@ -250,7 +264,8 @@ __device__ inline void _atomicMin(unsigned long long int *address,
 }
 ///
 template <>
-__device__ inline void _atomicMax(unsigned long long int *address,
+__device__ inline unsigned long long int _atomicMax(
+                                  unsigned long long int *address,
                                   unsigned long long int value)
 {
   unsigned long long int readback =
@@ -270,11 +285,11 @@ __device__ inline void _atomicMax(unsigned long long int *address,
 #endif
 
 #if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ >= 600
-/// don't specialize for 64-bit add if it exists
+// don't specialize for 64-bit add if it exists
 #else
 ///
 template <>
-__device__ inline void _atomicAdd(double *address, double value)
+__device__ inline double _atomicAdd(double *address, double value)
 {
   unsigned long long oldval, newval, readback;
 
@@ -285,6 +300,7 @@ __device__ inline void _atomicAdd(double *address, double value)
     oldval = readback;
     newval = __double_as_longlong(__longlong_as_double(oldval) + value);
   }
+  return __longlong_as_double(oldval);
 }
 #endif
 
@@ -301,7 +317,7 @@ __device__ inline void _atomicAdd(double *address, double value)
  ******************************************************************************
  */
 template <>
-__device__ inline void _atomicMin(double *address, double value)
+__device__ inline double _atomicMin(double *address, double value)
 {
   double temp = *(reinterpret_cast<double volatile *>(address));
   if (temp > value) {
@@ -317,11 +333,13 @@ __device__ inline void _atomicMin(double *address, double value)
                     assumed,
                     double_to_ull(RAJA_MIN(ull_to_double(assumed), value)));
     } while (assumed != oldval);
+    temp = ull_to_double(oldval);
   }
+  return temp;
 }
 ///
 template <>
-__device__ inline void _atomicMin(float *address, float value)
+__device__ inline float _atomicMin(float *address, float value)
 {
   float temp = *(reinterpret_cast<float volatile *>(address));
   if (temp > value) {
@@ -335,11 +353,13 @@ __device__ inline void _atomicMin(float *address, float value)
                     assumed,
                     __float_as_int(RAJA_MIN(__int_as_float(assumed), value)));
     } while (assumed != oldval);
+    temp = __int_as_float(oldval);
   }
+  return temp;
 }
 ///
 template <>
-__device__ inline void _atomicMax(double *address, double value)
+__device__ inline double _atomicMax(double *address, double value)
 {
   double temp = *(reinterpret_cast<double volatile *>(address));
   if (temp < value) {
@@ -355,11 +375,13 @@ __device__ inline void _atomicMax(double *address, double value)
                     assumed,
                     double_to_ull(RAJA_MAX(ull_to_double(assumed), value)));
     } while (assumed != oldval);
+    temp = ull_to_double(oldval);
   }
+  return temp;
 }
 ///
 template <>
-__device__ inline void _atomicMax(float *address, float value)
+__device__ inline float _atomicMax(float *address, float value)
 {
   float temp = *(reinterpret_cast<float volatile *>(address));
   if (temp < value) {
@@ -373,15 +395,18 @@ __device__ inline void _atomicMax(float *address, float value)
                     assumed,
                     __float_as_int(RAJA_MAX(__int_as_float(assumed), value)));
     } while (assumed != oldval);
+    temp = __int_as_float(oldval);
   }
+  return temp;
 }
 
 #if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ >= 350
-/// don't specialize for 64-bit min/max if they exist
+// don't specialize for 64-bit min/max if they exist
 #else
 ///
 template <>
-__device__ inline void _atomicMin(unsigned long long int *address,
+__device__ inline unsigned long long int _atomicMin(
+                                  unsigned long long int *address,
                                   unsigned long long int value)
 {
   unsigned long long int temp =
@@ -393,11 +418,14 @@ __device__ inline void _atomicMin(unsigned long long int *address,
       assumed = oldval;
       oldval = atomicCAS(address, assumed, RAJA_MIN(assumed, value));
     } while (assumed != oldval);
+    temp = oldval;
   }
+  return temp;
 }
 ///
 template <>
-__device__ inline void _atomicMax(unsigned long long int *address,
+__device__ inline unsigned long long int _atomicMax(
+                                  unsigned long long int *address,
                                   unsigned long long int value)
 {
   unsigned long long int temp =
@@ -409,16 +437,18 @@ __device__ inline void _atomicMax(unsigned long long int *address,
       assumed = oldval;
       oldval = atomicCAS(address, assumed, RAJA_MAX(assumed, value));
     } while (assumed != oldval);
+    temp = oldval;
   }
+  return temp;
 }
 #endif
 
 #if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ >= 600
-/// don't specialize for doubles if they exist
+// don't specialize for doubles if they exist
 #else
 ///
 template <>
-__device__ inline void _atomicAdd(double *address, double value)
+__device__ inline double _atomicAdd(double *address, double value)
 {
   unsigned long long int *address_as_ull = (unsigned long long int *)address;
   unsigned long long int oldval = *address_as_ull, assumed;
@@ -430,6 +460,7 @@ __device__ inline void _atomicAdd(double *address, double value)
                   assumed,
                   __double_as_longlong(__longlong_as_double(oldval) + value));
   } while (assumed != oldval);
+  return __longlong_as_double(oldval);
 }
 #endif
 
@@ -442,6 +473,8 @@ __device__ inline void _atomicAdd(double *address, double value)
 #error one of the options for using/not using atomics must be specified
 
 #endif
+
+} // end unnamed namespace for helper functions
 
 //
 //////////////////////////////////////////////////////////////////////
@@ -464,14 +497,16 @@ template <size_t BLOCK_SIZE, bool Async, typename T>
 class ReduceMin<cuda_reduce<BLOCK_SIZE, Async>, T>
 {
 public:
-  //
-  // Constructor takes initial reduction value (default ctor is disabled).
-  //
-  // Note: Ctor only executes on the host.
-  //
+  /*!
+   * \brief Constructor takes initial reduction value (default constructor
+   * is disabled).
+   *
+   * Note: Constructor only executes on the host.
+   */
+
   explicit ReduceMin(T init_val)
   {
-    m_is_copy = false;
+    m_is_copy_host = false;
     m_myID = getCudaReductionId();
     getCudaReductionTallyBlock(m_myID,
                                (void **)&m_tally_host,
@@ -479,26 +514,26 @@ public:
     m_tally_host->tally = init_val;
   }
 
-  //
-  // Copy ctor executes on both host and device.
-  //
+  /*!
+   * \brief Initialize shared memory on device, request shared memory on host.
+   *
+   * Copy constructor executes on both host and device.
+   * On host requests dynamic shared memory and gets offset into dynamic
+   * shared memory if in forall.
+   * On device initializes dynamic shared memory to appropriate value.
+   */
   __host__ __device__
   ReduceMin(const ReduceMin<cuda_reduce<BLOCK_SIZE, Async>, T> &other)
   {
     *this = other;
-    m_is_copy = true;
 #if defined(__CUDA_ARCH__)
+    m_is_copy_device = true;
+    m_finish_reduction = !other.m_is_copy_device;
     extern __shared__ unsigned char sd_block[];
     T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
 
     int threadId = threadIdx.x + blockDim.x * threadIdx.y
                    + (blockDim.x * blockDim.y) * threadIdx.z;
-
-    int threads = blockDim.x * blockDim.y * blockDim.z;
-
-    if (threadId == 0) {
-      assert(threads <= BLOCK_SIZE);
-    }
 
     // initialize shared memory
     T val = m_tally_device->tally;
@@ -511,63 +546,64 @@ public:
     if (threadId < 1) {
       sd[threadId] = val;
     }
-
     __syncthreads();
 #else
-    m_smem_offset = getCudaSharedmemOffset(m_myID, sizeof(T) * BLOCK_SIZE);
+    m_is_copy_host = true;
+    m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
 #endif
   }
 
-  //
-  // Destruction on host releases the global shared memory block chunk for
-  // reduction id and id itself for others to use.
-  //
-  // Note: destructor executes on both host and device.
-  //
+  /*!
+   * \brief Finish reduction on device and free memory on host.
+   *
+   * Destruction on host releases the device memory chunk for
+   * reduction id and id itself for others to use.
+   * Destruction on device completes the reduction.
+   *
+   * Note: destructor executes on both host and device.
+   */
   __host__ __device__ ~ReduceMin<cuda_reduce<BLOCK_SIZE, Async>, T>()
   {
 #if defined(__CUDA_ARCH__)
-    extern __shared__ unsigned char sd_block[];
-    T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
+    if (m_finish_reduction) {
+      extern __shared__ unsigned char sd_block[];
+      T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
 
-    int threadId = threadIdx.x + blockDim.x * threadIdx.y
-                   + (blockDim.x * blockDim.y) * threadIdx.z;
+      int threadId = threadIdx.x + blockDim.x * threadIdx.y
+                     + (blockDim.x * blockDim.y) * threadIdx.z;
 
-    __syncthreads();
-
-    for (int i = BLOCK_SIZE / 2; i >= WARP_SIZE; i /= 2) {
-      if (threadId < i) {
-        sd[threadId] = RAJA_MIN(sd[threadId], sd[threadId + i]);
-      }
       __syncthreads();
-    }
 
-    for (int i = WARP_SIZE / 2; i > 0; i /= 2) {
-      if (threadId < i) {
-        sd[threadId] = RAJA_MIN(sd[threadId], sd[threadId + i]);
+      for (int i = BLOCK_SIZE / 2; i >= WARP_SIZE; i /= 2) {
+        if (threadId < i) {
+          sd[threadId] = RAJA_MIN(sd[threadId], sd[threadId + i]);
+        }
+        __syncthreads();
+      }
+
+      for (int i = WARP_SIZE / 2; i > 0; i /= 2) {
+        if (threadId < i) {
+          sd[threadId] = RAJA_MIN(sd[threadId], sd[threadId + i]);
+        }
+      }
+
+      if (threadId < 1) {
+        _atomicMin<T>(&m_tally_device->tally, sd[threadId]);
       }
     }
-
-    if (threadId < 1) {
-      _atomicMin<T>(&m_tally_device->tally, sd[threadId]);
-    }
 #else
-#endif
-
-    if (!m_is_copy) {
-#if defined(__CUDA_ARCH__)
-#else
+    if (!m_is_copy_host) {
       releaseCudaReductionTallyBlock(m_myID);
       releaseCudaReductionId(m_myID);
-#endif
     }
+#endif
   }
 
-  //
-  // Operator that returns reduced min value.
-  //
-  // Note: accessor only executes on host.
-  //
+  /*!
+   * \brief Operator that returns reduced min value.
+   *
+   * Note: accessor only executes on host.
+   */
   operator T()
   {
     if (Async) {
@@ -578,18 +614,18 @@ public:
     return m_tally_host->tally;
   }
 
-  //
-  // Method that returns reduced min value.
-  //
-  // Note: accessor only executes on host.
-  //
+  /*!
+   * \brief Method that returns reduced min value.
+   *
+   * Note: accessor only executes on host.
+   */
   T get() { return operator T(); }
 
-  //
-  // Method that updates min value in proper device memory block locations.
-  //
-  // Note: only operates on device.
-  //
+  /*!
+   * \brief Method that updates min value.
+   *
+   * Note: only operates on device.
+   */
   __device__ ReduceMin<cuda_reduce<BLOCK_SIZE, Async>, T> const &min(T val) const
   {
     extern __shared__ unsigned char sd_block[];
@@ -604,22 +640,40 @@ public:
   }
 
 private:
-  //
-  // Default ctor is declared private and not implemented.
-  //
+  /*!
+   * \brief Default constructor is declared private and not implemented.
+   */
   ReduceMin<cuda_reduce<BLOCK_SIZE, Async>, T>();
 
+  /*!
+   * \brief Pointer to host tally block cache slot for this reduction variable.
+   */
   CudaReductionTallyTypeAtomic<T> *m_tally_host = nullptr;
 
+  /*!
+   * \brief Pointer to device tally block slot for this reduction variable.
+   */
   CudaReductionTallyTypeAtomic<T> *m_tally_device = nullptr;
 
+  /*!
+   * \brief My cuda reduction variable ID.
+   */
   int m_myID = -1;
 
+  /*!
+   * \brief Byte offset into dynamic shared memory.
+   */
   int m_smem_offset = -1;
 
-  bool m_is_copy = false;
+  /*!
+   * \brief If this variable is a copy or not; only original may release memory 
+   *        or perform finalization.
+   */
+  bool m_is_copy_host = false;
+  bool m_is_copy_device = false;
+  bool m_finish_reduction = false;
 
-  // Sanity checks for block size
+  // Sanity checks for block size and template type size
   static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
   static constexpr bool reasonableRangeCheck =
       ((BLOCK_SIZE >= 32) && (BLOCK_SIZE <= 1024));
@@ -632,8 +686,7 @@ private:
   static_assert(powerOfTwoCheck, "Error: block sizes must be a power of 2");
   static_assert(reasonableRangeCheck,
                 "Error: block sizes must be between 32 and 1024");
-  static_assert(
-      sizeofcheck,
+  static_assert(sizeofcheck,
       "Error: type must be of size <= " MACROSTR(RAJA_CUDA_REDUCE_VAR_MAXSIZE));
 };
 
@@ -650,14 +703,15 @@ template <size_t BLOCK_SIZE, bool Async, typename T>
 class ReduceMax<cuda_reduce<BLOCK_SIZE, Async>, T>
 {
 public:
-  //
-  // Constructor takes initial reduction value (default ctor is disabled).
-  //
-  // Note: Ctor only executes on the host.
-  //
+  /*!
+   * \brief Constructor takes initial reduction value (default constructor
+   * is disabled).
+   *
+   * Note: Constructor only executes on the host.
+   */
   explicit ReduceMax(T init_val)
   {
-    m_is_copy = false;
+    m_is_copy_host = false;
     m_myID = getCudaReductionId();
     getCudaReductionTallyBlock(m_myID,
                                (void **)&m_tally_host,
@@ -665,26 +719,26 @@ public:
     m_tally_host->tally = init_val;
   }
 
-  //
-  // Copy ctor executes on both host and device.
-  //
+  /*!
+   * \brief Initialize shared memory on device, request shared memory on host.
+   *
+   * Copy constructor executes on both host and device.
+   * On host requests dynamic shared memory and gets offset into dynamic
+   * shared memory if in forall.
+   * On device initializes dynamic shared memory to appropriate value.
+   */
   __host__ __device__
   ReduceMax(const ReduceMax<cuda_reduce<BLOCK_SIZE, Async>, T> &other)
   {
     *this = other;
-    m_is_copy = true;
 #if defined(__CUDA_ARCH__)
+    m_is_copy_device = true;
+    m_finish_reduction = !other.m_is_copy_device;
     extern __shared__ unsigned char sd_block[];
     T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
 
     int threadId = threadIdx.x + blockDim.x * threadIdx.y
                    + (blockDim.x * blockDim.y) * threadIdx.z;
-
-    int threads = blockDim.x * blockDim.y * blockDim.z;
-
-    if (threadId == 0) {
-      assert(threads <= BLOCK_SIZE);
-    }
 
     // initialize shared memory
     T val = m_tally_device->tally;
@@ -700,60 +754,62 @@ public:
 
     __syncthreads();
 #else
-    m_smem_offset = getCudaSharedmemOffset(m_myID, sizeof(T) * BLOCK_SIZE);
+    m_is_copy_host = true;
+    m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
 #endif
   }
 
-  //
-  // Destruction on host releases the global shared memory block chunk for
-  // reduction id and id itself for others to use.
-  //
-  // Note: destructor executes on both host and device.
-  //
+  /*!
+   * \brief Finish reduction on device and free memory on host.
+   *
+   * Destruction on host releases the device memory chunk for
+   * reduction id and id itself for others to use.
+   * Destruction on device completed the reduction.
+   *
+   * Note: destructor executes on both host and device.
+   */
   __host__ __device__ ~ReduceMax<cuda_reduce<BLOCK_SIZE, Async>, T>()
   {
 #if defined(__CUDA_ARCH__)
-    extern __shared__ unsigned char sd_block[];
-    T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
+    if (m_finish_reduction) {
+      extern __shared__ unsigned char sd_block[];
+      T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
 
-    int threadId = threadIdx.x + blockDim.x * threadIdx.y
-                   + (blockDim.x * blockDim.y) * threadIdx.z;
+      int threadId = threadIdx.x + blockDim.x * threadIdx.y
+                     + (blockDim.x * blockDim.y) * threadIdx.z;
 
-    __syncthreads();
-
-    for (int i = BLOCK_SIZE / 2; i >= WARP_SIZE; i /= 2) {
-      if (threadId < i) {
-        sd[threadId] = RAJA_MAX(sd[threadId], sd[threadId + i]);
-      }
       __syncthreads();
-    }
 
-    for (int i = WARP_SIZE / 2; i > 0; i /= 2) {
-      if (threadId < i) {
-        sd[threadId] = RAJA_MAX(sd[threadId], sd[threadId + i]);
+      for (int i = BLOCK_SIZE / 2; i >= WARP_SIZE; i /= 2) {
+        if (threadId < i) {
+          sd[threadId] = RAJA_MAX(sd[threadId], sd[threadId + i]);
+        }
+        __syncthreads();
+      }
+
+      for (int i = WARP_SIZE / 2; i > 0; i /= 2) {
+        if (threadId < i) {
+          sd[threadId] = RAJA_MAX(sd[threadId], sd[threadId + i]);
+        }
+      }
+
+      if (threadId < 1) {
+        _atomicMax<T>(&m_tally_device->tally, sd[threadId]);
       }
     }
-
-    if (threadId < 1) {
-      _atomicMax<T>(&m_tally_device->tally, sd[threadId]);
-    }
 #else
-#endif
-
-    if (!m_is_copy) {
-#if defined(__CUDA_ARCH__)
-#else
+    if (!m_is_copy_host) {
       releaseCudaReductionTallyBlock(m_myID);
       releaseCudaReductionId(m_myID);
-#endif
     }
+#endif
   }
 
-  //
-  // Operator that returns reduced max value.
-  //
-  // Note: accessor only executes on host.
-  //
+  /*!
+   * \brief Operator that returns reduced max value.
+   *
+   * Note: accessor only executes on host.
+   */
   operator T()
   {
     if (Async) {
@@ -764,18 +820,18 @@ public:
     return m_tally_host->tally;
   }
 
-  //
-  // Method that returns reduced max value.
-  //
-  // Note: accessor only executes on host.
-  //
+  /*!
+   * \brief Method that returns reduced max value.
+   *
+   * Note: accessor only executes on host.
+   */
   T get() { return operator T(); }
 
-  //
-  // Method that updates max value in proper device memory block locations.
-  //
-  // Note: only operates on device.
-  //
+  /*!
+   * \brief Method that updates max value.
+   *
+   * Note: only operates on device.
+   */
   __device__ ReduceMax<cuda_reduce<BLOCK_SIZE, Async>, T> const &max(T val)
    const
   {
@@ -791,22 +847,40 @@ public:
   }
 
 private:
-  //
-  // Default ctor is declared private and not implemented.
-  //
+  /*!
+   * \brief Default constructor is declared private and not implemented.
+   */
   ReduceMax<cuda_reduce<BLOCK_SIZE, Async>, T>();
 
+  /*!
+   * \brief Pointer to host tally block cache slot for this reduction variable.
+   */
   CudaReductionTallyTypeAtomic<T> *m_tally_host = nullptr;
 
+  /*!
+   * \brief Pointer to device tally block slot for this reduction variable.
+   */
   CudaReductionTallyTypeAtomic<T> *m_tally_device = nullptr;
 
+  /*!
+   * \brief My cuda reduction variable ID.
+   */
   int m_myID = -1;
 
+  /*!
+   * \brief Byte offset into dynamic shared memory.
+   */
   int m_smem_offset = -1;
 
-  bool m_is_copy = false;
+  /*!
+   * \brief If this variable is a copy or not; only original may release memory 
+   *        or perform finalization.
+   */
+  bool m_is_copy_host = false;
+  bool m_is_copy_device = false;
+  bool m_finish_reduction = false;
 
-  // Sanity checks for block size
+  // Sanity checks for block size and template type size
   static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
   static constexpr bool reasonableRangeCheck =
       ((BLOCK_SIZE >= 32) && (BLOCK_SIZE <= 1024));
@@ -819,8 +893,7 @@ private:
   static_assert(powerOfTwoCheck, "Error: block sizes must be a power of 2");
   static_assert(reasonableRangeCheck,
                 "Error: block sizes must be between 32 and 1024");
-  static_assert(
-      sizeofcheck,
+  static_assert(sizeofcheck,
       "Error: type must be of size <= " MACROSTR(RAJA_CUDA_REDUCE_VAR_MAXSIZE));
 };
 
@@ -837,50 +910,44 @@ template <size_t BLOCK_SIZE, bool Async, typename T>
 class ReduceSum<cuda_reduce<BLOCK_SIZE, Async>, T>
 {
 public:
-  //
-  // Constructor takes initial reduction value (default ctor is disabled).
-  //
-  // Note: Ctor only executes on the host.
-  //
+  /*!
+   * \brief Constructor takes initial reduction value (default constructor
+   * is disabled).
+   *
+   * Note: Constructor only executes on the host.
+   */
   explicit ReduceSum(T init_val)
   {
-    m_is_copy = false;
+    m_is_copy_host = false;
     m_myID = getCudaReductionId();
     getCudaReductionMemBlock(m_myID, (void **)&m_blockdata);
     getCudaReductionTallyBlock(m_myID,
                                (void **)&m_tally_host,
                                (void **)&m_tally_device);
     m_tally_host->tally = init_val;
-    m_tally_host->maxGridSize = static_cast<GridSizeType>(0);
     m_tally_host->retiredBlocks = static_cast<GridSizeType>(0);
   }
 
-  //
-  // Copy ctor executes on both host and device.
-  //
+  /*!
+   * \brief Initialize shared memory on device, request shared memory on host.
+   *
+   * Copy constructor executes on both host and device.
+   * On host requests dynamic shared memory and gets offset into dynamic
+   * shared memory if in forall.
+   * On device initializes dynamic shared memory to appropriate value.
+   */
   __host__ __device__
   ReduceSum(const ReduceSum<cuda_reduce<BLOCK_SIZE, Async>, T> &other)
   {
     *this = other;
-    m_is_copy = true;
 #if defined(__CUDA_ARCH__)
+    m_is_copy_device = true;
+    m_finish_reduction = !other.m_is_copy_device;
     extern __shared__ unsigned char sd_block[];
     T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
 
-    int blockId = blockIdx.x + blockIdx.y * gridDim.x
-                  + gridDim.x * gridDim.y * blockIdx.z;
-
     int threadId = threadIdx.x + blockDim.x * threadIdx.y
                    + (blockDim.x * blockDim.y) * threadIdx.z;
-
-    int threads = blockDim.x * blockDim.y * blockDim.z;
-    int blocks = gridDim.x * gridDim.y * gridDim.z;
-
-    if (blockId + threadId == 0) {
-      assert(threads <= BLOCK_SIZE);
-      m_tally_device->maxGridSize =
-          RAJA_MAX(blocks, m_tally_device->maxGridSize);
-    }
 
     // initialize shared memory
     T val = static_cast<T>(0);
@@ -896,74 +963,35 @@ public:
 
     __syncthreads();
 #else
-    m_smem_offset = getCudaSharedmemOffset(m_myID, sizeof(T) * BLOCK_SIZE);
+    m_is_copy_host = true;
+    m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
 #endif
   }
 
-  //
-  // Destruction on host releases the global shared memory block chunk for
-  // reduction id and id itself for others to use.
-  //
-  // Note: destructor executes on both host and device.
-  //
+  /*!
+   * \brief Finish reduction on device and free memory on host.
+   *
+   * Destruction on host releases the device memory chunk for
+   * reduction id and id itself for others to use.
+   * Destruction on device completes the reduction.
+   *
+   * Note: destructor executes on both host and device.
+   */
   __host__ __device__ ~ReduceSum<cuda_reduce<BLOCK_SIZE, Async>, T>()
   {
 #if defined(__CUDA_ARCH__)
-    extern __shared__ unsigned char sd_block[];
-    T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
+    if (m_finish_reduction) {
+      extern __shared__ unsigned char sd_block[];
+      T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
 
-    int blockId = blockIdx.x + blockIdx.y * gridDim.x
-                  + gridDim.x * gridDim.y * blockIdx.z;
+      int blockId = blockIdx.x + blockIdx.y * gridDim.x
+                    + gridDim.x * gridDim.y * blockIdx.z;
 
-    int blocks = gridDim.x * gridDim.y * gridDim.z;
+      int blocks = gridDim.x * gridDim.y * gridDim.z;
 
-    int threadId = threadIdx.x + blockDim.x * threadIdx.y
-                   + (blockDim.x * blockDim.y) * threadIdx.z;
+      int threadId = threadIdx.x + blockDim.x * threadIdx.y
+                     + (blockDim.x * blockDim.y) * threadIdx.z;
 
-    __syncthreads();
-
-    for (int i = BLOCK_SIZE / 2; i >= WARP_SIZE; i /= 2) {
-      if (threadId < i) {
-        sd[threadId] += sd[threadId + i];
-      }
-      __syncthreads();
-    }
-
-    T temp;
-    if (threadId < WARP_SIZE) {
-      temp = sd[threadId];
-      for (int i = WARP_SIZE / 2; i > 0; i /= 2) {
-        temp += shfl_xor<T>(temp, i);
-      }
-    }
-
-    bool lastBlock = false;
-    if (threadId < 1) {
-      // write data to gmem block
-      m_blockdata->values[blockId] = temp;
-      // ensure write visible to all threadblocks
-      __threadfence();
-      // increment counter, (wraps back to zero at second parameter)
-      unsigned int oldBlockCount =
-          atomicInc((unsigned int *)&m_tally_device->retiredBlocks,
-                    (blocks - 1));
-      lastBlock = (oldBlockCount == (blocks - 1));
-    }
-
-    // returns non-zero value if any thread in this block passed in a non-zero
-    // value
-    lastBlock = __syncthreads_or(lastBlock);
-
-    if (lastBlock) {
-      T temp = static_cast<T>(0);
-
-      int threads = blockDim.x * blockDim.y * blockDim.z;
-      for (int i = threadId; i < blocks; i += threads) {
-        temp += m_blockdata->values[i];
-      }
-      // don't need to zero high number not participating threads sd slots as
-      // done for block reduction
-      sd[threadId] = temp;
       __syncthreads();
 
       for (int i = BLOCK_SIZE / 2; i >= WARP_SIZE; i /= 2) {
@@ -973,6 +1001,7 @@ public:
         __syncthreads();
       }
 
+      T temp;
       if (threadId < WARP_SIZE) {
         temp = sd[threadId];
         for (int i = WARP_SIZE / 2; i > 0; i /= 2) {
@@ -980,28 +1009,66 @@ public:
         }
       }
 
+      bool lastBlock = false;
       if (threadId < 1) {
-        // add reduction to tally
-        m_tally_device->tally += temp;
+        // write data to global memory block
+        m_blockdata->values[blockId] = temp;
+        // ensure write visible to all threadblocks
+        __threadfence();
+        // increment counter, (wraps back to zero at second parameter)
+        unsigned int oldBlockCount =
+            atomicInc((unsigned int *)&m_tally_device->retiredBlocks,
+                      (blocks - 1));
+        lastBlock = (oldBlockCount == (blocks - 1));
+      }
+
+      // returns non-zero value if any thread passes in a non-zero value
+      lastBlock = __syncthreads_or(lastBlock);
+
+      if (lastBlock) {
+        T temp = static_cast<T>(0);
+
+        int threads = blockDim.x * blockDim.y * blockDim.z;
+        for (int i = threadId; i < blocks; i += threads) {
+          temp += m_blockdata->values[i];
+        }
+        // any unused slots were initialized in copy constructor
+        sd[threadId] = temp;
+        __syncthreads();
+
+        for (int i = BLOCK_SIZE / 2; i >= WARP_SIZE; i /= 2) {
+          if (threadId < i) {
+            sd[threadId] += sd[threadId + i];
+          }
+          __syncthreads();
+        }
+
+        if (threadId < WARP_SIZE) {
+          temp = sd[threadId];
+          for (int i = WARP_SIZE / 2; i > 0; i /= 2) {
+            temp += shfl_xor<T>(temp, i);
+          }
+        }
+
+        if (threadId < 1) {
+          // add reduction to tally
+          m_tally_device->tally += temp;
+        }
       }
     }
 #else
-#endif
-
-    if (!m_is_copy) {
-#if defined(__CUDA_ARCH__)
-#else
+    if (!m_is_copy_host) {
       releaseCudaReductionTallyBlock(m_myID);
       releaseCudaReductionId(m_myID);
-#endif
     }
+#endif
   }
 
-  //
-  // Operator that returns reduced sum value.
-  //
-  // Note: accessor only executes on host.
-  //
+  /*!
+   * \brief Operator that returns reduced sum value.
+   *
+   * Note: accessor only executes on host.
+   */
   operator T()
   {
     if (Async) {
@@ -1009,23 +1076,21 @@ public:
     } else {
       beforeCudaReadTallyBlock(m_myID);
     }
-    assert(m_tally_host->maxGridSize <= RAJA_CUDA_REDUCE_BLOCK_LENGTH);
     return m_tally_host->tally;
   }
 
-  //
-  // Method that returns reduced sum value.
-  //
-  // Note: accessor only executes on host.
-  //
+  /*!
+   * \brief Method that returns reduced sum value.
+   *
+   * Note: accessor only executes on host.
+   */
   T get() { return operator T(); }
 
-  //
-  // += operator that adds value to sum in the proper device shared
-  // memory block locations.
-  //
-  // Note: only operates on device.
-  //
+  /*!
+   * \brief Operator that adds value to sum.
+   *
+   * Note: only operates on device.
+   */
   __device__ ReduceSum<cuda_reduce<BLOCK_SIZE, Async>, T> const &operator+=(
       T val) const
   {
@@ -1042,24 +1107,45 @@ public:
   }
 
 private:
-  //
-  // Default ctor is declared private and not implemented.
-  //
+  /*!
+   * \brief Default constructor is declared private and not implemented.
+   */
   ReduceSum<cuda_reduce<BLOCK_SIZE, Async>, T>();
 
+  /*!
+   * \brief Pointer to host tally block cache slot for this reduction variable.
+   */
   CudaReductionTallyType<T> *m_tally_host = nullptr;
 
+  /*!
+   * \brief Pointer to device data block for this reduction variable.
+   */
   CudaReductionBlockType<T> *m_blockdata = nullptr;
 
+  /*!
+   * \brief Pointer to device tally block slot for this reduction variable.
+   */
   CudaReductionTallyType<T> *m_tally_device = nullptr;
 
+  /*!
+   * \brief My cuda reduction variable ID.
+   */
   int m_myID = -1;
 
+  /*!
+   * \brief Byte offset into dynamic shared memory.
+   */
   int m_smem_offset = -1;
 
-  bool m_is_copy = false;
+  /*!
+   * \brief If this variable is a copy or not; only original may release memory 
+   *        or perform finalization.
+   */
+  bool m_is_copy_host = false;
+  bool m_is_copy_device = false;
+  bool m_finish_reduction = false;
 
-  // Sanity checks for block size
+  // Sanity checks for block size and template type size
   static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
   static constexpr bool reasonableRangeCheck =
       ((BLOCK_SIZE >= 32) && (BLOCK_SIZE <= 1024));
@@ -1072,8 +1158,7 @@ private:
   static_assert(powerOfTwoCheck, "Error: block sizes must be a power of 2");
   static_assert(reasonableRangeCheck,
                 "Error: block sizes must be between 32 and 1024");
-  static_assert(
-      sizeofcheck,
+  static_assert(sizeofcheck,
       "Error: type must be of size <= " MACROSTR(RAJA_CUDA_REDUCE_VAR_MAXSIZE));
 };
 
@@ -1091,14 +1176,15 @@ template <size_t BLOCK_SIZE, bool Async, typename T>
 class ReduceSum<cuda_reduce_atomic<BLOCK_SIZE, Async>, T>
 {
 public:
-  //
-  // Constructor takes initial reduction value (default ctor is disabled).
-  //
-  // Note: Ctor only executes on the host.
-  //
+  /*!
+   * \brief Constructor takes initial reduction value (default constructor
+   * is disabled).
+   *
+   * Note: Constructor only executes on the host.
+   */
   explicit ReduceSum(T init_val)
   {
-    m_is_copy = false;
+    m_is_copy_host = false;
     m_myID = getCudaReductionId();
     getCudaReductionTallyBlock(m_myID,
                                (void **)&m_tally_host,
@@ -1106,26 +1192,26 @@ public:
     m_tally_host->tally = init_val;
   }
 
-  //
-  // Copy ctor executes on both host and device.
-  //
+  /*!
+   * \brief Initialize shared memory on device, request shared memory on host.
+   *
+   * Copy constructor executes on both host and device.
+   * On host requests dynamic shared memory and gets offset into dynamic
+   * shared memory if in forall.
+   * On device initializes dynamic shared memory to appropriate value.
+   */
   __host__ __device__
   ReduceSum(const ReduceSum<cuda_reduce_atomic<BLOCK_SIZE, Async>, T> &other)
   {
     *this = other;
-    m_is_copy = true;
 #if defined(__CUDA_ARCH__)
+    m_is_copy_device = true;
+    m_finish_reduction = !other.m_is_copy_device;
     extern __shared__ unsigned char sd_block[];
     T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
 
     int threadId = threadIdx.x + blockDim.x * threadIdx.y
                    + (blockDim.x * blockDim.y) * threadIdx.z;
-
-    int threads = blockDim.x * blockDim.y * blockDim.z;
-
-    if (threadId == 0) {
-      assert(threads <= BLOCK_SIZE);
-    }
 
     // initialize shared memory
     T val = static_cast<T>(0);
@@ -1141,63 +1227,67 @@ public:
 
     __syncthreads();
 #else
-    m_smem_offset = getCudaSharedmemOffset(m_myID, sizeof(T) * BLOCK_SIZE);
+    m_is_copy_host = true;
+    m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
 #endif
   }
 
-  // Destruction on host releases the global shared memory block chunk for
-  //
-  // reduction id and id itself for others to use.
-  //
-  // Note: destructor executes on both host and device.
-  //
+  /*!
+   * \brief Finish reduction on device and free memory on host.
+   *
+   * Destruction on host releases the device memory chunk for
+   * reduction id and id itself for others to use.
+   * Destruction on device completes the reduction.
+   *
+   * Note: destructor executes on both host and device.
+   */
   __host__ __device__ ~ReduceSum<cuda_reduce_atomic<BLOCK_SIZE, Async>, T>()
   {
 #if defined(__CUDA_ARCH__)
-    extern __shared__ unsigned char sd_block[];
-    T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
+    if (m_finish_reduction) {
+      extern __shared__ unsigned char sd_block[];
+      T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
 
-    int threadId = threadIdx.x + blockDim.x * threadIdx.y
-                   + (blockDim.x * blockDim.y) * threadIdx.z;
+      int threadId = threadIdx.x + blockDim.x * threadIdx.y
+                     + (blockDim.x * blockDim.y) * threadIdx.z;
 
-    T temp = 0;
-    __syncthreads();
-
-    for (int i = BLOCK_SIZE / 2; i >= WARP_SIZE; i /= 2) {
-      if (threadId < i) {
-        sd[threadId] += sd[threadId + i];
-      }
+      T temp = 0;
       __syncthreads();
-    }
 
-    if (threadId < WARP_SIZE) {
-      temp = sd[threadId];
-      for (int i = WARP_SIZE / 2; i > 0; i /= 2) {
-        temp += shfl_xor<T>(temp, i);
+      for (int i = BLOCK_SIZE / 2; i >= WARP_SIZE; i /= 2) {
+        if (threadId < i) {
+          sd[threadId] += sd[threadId + i];
+        }
+        __syncthreads();
+      }
+
+      if (threadId < WARP_SIZE) {
+        temp = sd[threadId];
+        for (int i = WARP_SIZE / 2; i > 0; i /= 2) {
+          temp += shfl_xor<T>(temp, i);
+        }
+      }
+
+      // one thread adds to tally
+      if (threadId == 0) {
+        _atomicAdd<T>(&(m_tally_device->tally), temp);
       }
     }
-
-    // one thread adds to tally
-    if (threadId == 0) {
-      _atomicAdd<T>(&(m_tally_device->tally), temp);
-    }
 #else
-#endif
-
-    if (!m_is_copy) {
-#if defined(__CUDA_ARCH__)
-#else
+    if (!m_is_copy_host) {
       releaseCudaReductionTallyBlock(m_myID);
       releaseCudaReductionId(m_myID);
-#endif
     }
+#endif
+
+    
   }
 
-  //
-  // Operator that returns reduced sum value.
-  //
-  // Note: accessor only executes on host.
-  //
+  /*!
+   * \brief Operator that returns reduced sum value.
+   *
+   * Note: accessor only executes on host.
+   */
   operator T()
   {
     if (Async) {
@@ -1208,19 +1298,18 @@ public:
     return m_tally_host->tally;
   }
 
-  //
-  // Operator that returns reduced sum value.
-  //
-  // Note: accessor only executes on host.
-  //
+  /*!
+   * \brief Operator that returns reduced sum value.
+   *
+   * Note: accessor only executes on host.
+   */
   T get() { return operator T(); }
 
-  //
-  // += operator that adds value to sum in the proper device
-  // memory block locations.
-  //
-  // Note: only operates on device.
-  //
+  /*!
+   * \brief Operator that adds value to sum.
+   *
+   * Note: only operates on device.
+   */
   __device__ ReduceSum<cuda_reduce_atomic<BLOCK_SIZE, Async>, T> const &
   operator+=(T val) const
   {
@@ -1236,22 +1325,40 @@ public:
   }
 
 private:
-  //
-  // Default ctor is declared private and not implemented.
-  //
+  /*!
+   * \brief Default constructor is declared private and not implemented.
+   */
   ReduceSum<cuda_reduce_atomic<BLOCK_SIZE, Async>, T>();
 
+  /*!
+   * \brief Pointer to host tally block cache slot for this reduction variable.
+   */
   CudaReductionTallyTypeAtomic<T> *m_tally_host = nullptr;
 
+  /*!
+   * \brief Pointer to device tally block slot for this reduction variable.
+   */
   CudaReductionTallyTypeAtomic<T> *m_tally_device = nullptr;
 
+  /*!
+   * \brief My cuda reduction variable ID.
+   */
   int m_myID = -1;
 
+  /*!
+   * \brief Byte offset into dynamic shared memory.
+   */
   int m_smem_offset = -1;
 
-  bool m_is_copy = false;
+  /*!
+   * \brief If this variable is a copy or not; only original may release memory 
+   *        or perform finalization.
+   */
+  bool m_is_copy_host = false;
+  bool m_is_copy_device = false;
+  bool m_finish_reduction = false;
 
-  // Sanity checks for block size
+  // Sanity checks for block size and template type size
   static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
   static constexpr bool reasonableRangeCheck =
       ((BLOCK_SIZE >= 32) && (BLOCK_SIZE <= 1024));
@@ -1264,8 +1371,7 @@ private:
   static_assert(powerOfTwoCheck, "Error: block sizes must be a power of 2");
   static_assert(reasonableRangeCheck,
                 "Error: block sizes must be between 32 and 1024");
-  static_assert(
-      sizeofcheck,
+  static_assert(sizeofcheck,
       "Error: type must be of size <= " MACROSTR(RAJA_CUDA_REDUCE_VAR_MAXSIZE));
 };
 
@@ -1294,14 +1400,15 @@ template <size_t BLOCK_SIZE, bool Async, typename T>
 class ReduceMinLoc<cuda_reduce<BLOCK_SIZE, Async>, T>
 {
 public:
-  //
-  // Constructor takes initial reduction value (default ctor is disabled).
-  //
-  // Note: Ctor only executes on the host.
-  //
+  /*!
+   * \brief Constructor takes initial reduction value (default constructor
+   * is disabled).
+   *
+   * Note: Constructor only executes on the host.
+   */
   explicit ReduceMinLoc(T init_val, Index_type init_loc)
   {
-    m_is_copy = false;
+    m_is_copy_host = false;
     m_myID = getCudaReductionId();
     getCudaReductionMemBlock(m_myID, (void **)&m_blockdata);
     getCudaReductionTallyBlock(m_myID,
@@ -1309,38 +1416,31 @@ public:
                                (void **)&m_tally_device);
     m_tally_host->tally.val = init_val;
     m_tally_host->tally.idx = init_loc;
-    m_tally_host->maxGridSize = static_cast<GridSizeType>(0);
     m_tally_host->retiredBlocks = static_cast<GridSizeType>(0);
   }
 
-  //
-  // Copy ctor executes on both host and device.
-  //
+  /*!
+   * \brief Initialize shared memory on device, request shared memory on host.
+   *
+   * Copy constructor executes on both host and device.
+   * On host requests dynamic shared memory and gets offset into dynamic
+   * shared memory if in forall.
+   * On device initializes dynamic shared memory to appropriate value.
+   */
   __host__ __device__
   ReduceMinLoc(const ReduceMinLoc<cuda_reduce<BLOCK_SIZE, Async>, T> &other)
   {
     *this = other;
-    m_is_copy = true;
 #if defined(__CUDA_ARCH__)
+    m_is_copy_device = true;
+    m_finish_reduction = !other.m_is_copy_device;
     extern __shared__ unsigned char sd_block[];
     T *sd_val = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
     Index_type *sd_idx = reinterpret_cast<Index_type *>(
         &sd_block[m_smem_offset + sizeof(T) * BLOCK_SIZE]);
 
-    int blockId = blockIdx.x + blockIdx.y * gridDim.x
-                  + gridDim.x * gridDim.y * blockIdx.z;
-
     int threadId = threadIdx.x + blockDim.x * threadIdx.y
                    + (blockDim.x * blockDim.y) * threadIdx.z;
-
-    int threads = blockDim.x * blockDim.y * blockDim.z;
-    int blocks = gridDim.x * gridDim.y * gridDim.z;
-
-    if (blockId + threadId == 0) {
-      assert(threads <= BLOCK_SIZE);
-      m_tally_device->maxGridSize =
-          RAJA_MAX(blocks, m_tally_device->maxGridSize);
-    }
 
     // initialize shared memory
     T val = m_tally_device->tally.val;
@@ -1359,86 +1459,39 @@ public:
 
     __syncthreads();
 #else
+    m_is_copy_host = true;
     m_smem_offset =
-        getCudaSharedmemOffset(m_myID,
-                               (sizeof(T) + sizeof(Index_type)) * BLOCK_SIZE);
+        getCudaSharedmemOffset(m_myID, BLOCK_SIZE, 
+                               (sizeof(T) + sizeof(Index_type)));
 #endif
   }
 
-  //
-  // Destruction on host releases the global shared memory block chunk for
-  // reduction id and id itself for others to use.
-  //
-  // Note: destructor executes on both host and device.
-  //
+  /*!
+   * \brief Finish reduction on device and free memory on host.
+   *
+   * Destruction on host releases the device memory chunk for
+   * reduction id and id itself for others to use.
+   * Destruction on device completes the reduction.
+   *
+   * Note: destructor executes on both host and device.
+   */
   __host__ __device__ ~ReduceMinLoc<cuda_reduce<BLOCK_SIZE, Async>, T>()
   {
 #if defined(__CUDA_ARCH__)
-    extern __shared__ unsigned char sd_block[];
-    T *sd_val = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
-    Index_type *sd_idx = reinterpret_cast<Index_type *>(
-        &sd_block[m_smem_offset + sizeof(T) * BLOCK_SIZE]);
+    if (m_finish_reduction) {
+      extern __shared__ unsigned char sd_block[];
+      T *sd_val = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
+      Index_type *sd_idx = reinterpret_cast<Index_type *>(
+          &sd_block[m_smem_offset + sizeof(T) * BLOCK_SIZE]);
 
-    int blockId = blockIdx.x + blockIdx.y * gridDim.x
-                  + gridDim.x * gridDim.y * blockIdx.z;
+      int blockId = blockIdx.x + blockIdx.y * gridDim.x
+                    + gridDim.x * gridDim.y * blockIdx.z;
 
-    int blocks = gridDim.x * gridDim.y * gridDim.z;
+      int blocks = gridDim.x * gridDim.y * gridDim.z;
 
-    int threadId = threadIdx.x + blockDim.x * threadIdx.y
-                   + (blockDim.x * blockDim.y) * threadIdx.z;
+      int threadId = threadIdx.x + blockDim.x * threadIdx.y
+                     + (blockDim.x * blockDim.y) * threadIdx.z;
 
-    __syncthreads();
-
-    for (int i = BLOCK_SIZE / 2; i >= WARP_SIZE; i /= 2) {
-      if (threadId < i) {
-        RAJA_CUDA_MINLOC(sd_val[threadId],
-                         sd_idx[threadId],
-                         sd_val[threadId],
-                         sd_idx[threadId],
-                         sd_val[threadId + i],
-                         sd_idx[threadId + i]);
-      }
-      __syncthreads();
-    }
-
-    for (int i = WARP_SIZE / 2; i > 0; i /= 2) {
-      if (threadId < i) {
-        RAJA_CUDA_MINLOC(sd_val[threadId],
-                         sd_idx[threadId],
-                         sd_val[threadId],
-                         sd_idx[threadId],
-                         sd_val[threadId + i],
-                         sd_idx[threadId + i]);
-      }
-    }
-
-    bool lastBlock = false;
-    if (threadId < 1) {
-      m_blockdata->values[blockId] = sd_val[threadId];
-      m_blockdata->indices[blockId] = sd_idx[threadId];
-
-      __threadfence();
-      unsigned int oldBlockCount =
-          atomicInc((unsigned int *)&m_tally_device->retiredBlocks,
-                    (blocks - 1));
-      lastBlock = (oldBlockCount == (blocks - 1));
-    }
-    lastBlock = __syncthreads_or(lastBlock);
-
-    if (lastBlock) {
-      CudaReductionLocType<T> lmin{sd_val[0], sd_idx[0]};
-
-      int threads = blockDim.x * blockDim.y * blockDim.z;
-      for (int i = threadId; i < blocks; i += threads) {
-        RAJA_CUDA_MINLOC(lmin.val,
-                         lmin.idx,
-                         lmin.val,
-                         lmin.idx,
-                         m_blockdata->values[i],
-                         m_blockdata->indices[i]);
-      }
-      sd_val[threadId] = lmin.val;
-      sd_idx[threadId] = lmin.idx;
       __syncthreads();
 
       for (int i = BLOCK_SIZE / 2; i >= WARP_SIZE; i /= 2) {
@@ -1464,32 +1517,81 @@ public:
         }
       }
 
+      bool lastBlock = false;
       if (threadId < 1) {
-        RAJA_CUDA_MINLOC(m_tally_device->tally.val,
-                         m_tally_device->tally.idx,
-                         m_tally_device->tally.val,
-                         m_tally_device->tally.idx,
-                         sd_val[threadId],
-                         sd_idx[threadId]);
+        m_blockdata->values[blockId] = sd_val[threadId];
+        m_blockdata->indices[blockId] = sd_idx[threadId];
+
+        __threadfence();
+        unsigned int oldBlockCount =
+            atomicInc((unsigned int *)&m_tally_device->retiredBlocks,
+                      (blocks - 1));
+        lastBlock = (oldBlockCount == (blocks - 1));
+      }
+      lastBlock = __syncthreads_or(lastBlock);
+
+      if (lastBlock) {
+        CudaReductionLocType<T> lmin{sd_val[0], sd_idx[0]};
+
+        int threads = blockDim.x * blockDim.y * blockDim.z;
+        for (int i = threadId; i < blocks; i += threads) {
+          RAJA_CUDA_MINLOC(lmin.val,
+                           lmin.idx,
+                           lmin.val,
+                           lmin.idx,
+                           m_blockdata->values[i],
+                           m_blockdata->indices[i]);
+        }
+        sd_val[threadId] = lmin.val;
+        sd_idx[threadId] = lmin.idx;
+        __syncthreads();
+
+        for (int i = BLOCK_SIZE / 2; i >= WARP_SIZE; i /= 2) {
+          if (threadId < i) {
+            RAJA_CUDA_MINLOC(sd_val[threadId],
+                             sd_idx[threadId],
+                             sd_val[threadId],
+                             sd_idx[threadId],
+                             sd_val[threadId + i],
+                             sd_idx[threadId + i]);
+          }
+          __syncthreads();
+        }
+
+        for (int i = WARP_SIZE / 2; i > 0; i /= 2) {
+          if (threadId < i) {
+            RAJA_CUDA_MINLOC(sd_val[threadId],
+                             sd_idx[threadId],
+                             sd_val[threadId],
+                             sd_idx[threadId],
+                             sd_val[threadId + i],
+                             sd_idx[threadId + i]);
+          }
+        }
+
+        if (threadId < 1) {
+          RAJA_CUDA_MINLOC(m_tally_device->tally.val,
+                           m_tally_device->tally.idx,
+                           m_tally_device->tally.val,
+                           m_tally_device->tally.idx,
+                           sd_val[threadId],
+                           sd_idx[threadId]);
+        }
       }
     }
 #else
-#endif
-
-    if (!m_is_copy) {
-#if defined(__CUDA_ARCH__)
-#else
+    if (!m_is_copy_host) {
       releaseCudaReductionTallyBlock(m_myID);
       releaseCudaReductionId(m_myID);
-#endif
     }
+#endif
   }
 
-  //
-  // Operator that returns reduced min value.
-  //
-  // Note: accessor only executes on host.
-  //
+  /*!
+   * \brief Operator that returns reduced min value.
+   *
+   * Note: accessor only executes on host.
+   */
   operator T()
   {
     if (Async) {
@@ -1497,22 +1599,21 @@ public:
     } else {
       beforeCudaReadTallyBlock(m_myID);
     }
-    assert(m_tally_host->maxGridSize <= RAJA_CUDA_REDUCE_BLOCK_LENGTH);
     return m_tally_host->tally.val;
   }
 
-  //
-  // Method that returns reduced min value.
-  //
-  // Note: accessor only executes on host.
-  //
+  /*!
+   * \brief Method that returns reduced min value.
+   *
+   * Note: accessor only executes on host.
+   */
   T get() { return operator T(); }
 
-  //
-  // Method that returns index value corresponding to the reduced min.
-  //
-  // Note: accessor only executes on host.
-  //
+  /*!
+   * \brief Method that returns index value corresponding to the reduced min.
+   *
+   * Note: accessor only executes on host.
+   */
   Index_type getLoc()
   {
     if (Async) {
@@ -1520,16 +1621,14 @@ public:
     } else {
       beforeCudaReadTallyBlock(m_myID);
     }
-    assert(m_tally_host->maxGridSize <= RAJA_CUDA_REDUCE_BLOCK_LENGTH);
     return m_tally_host->tally.idx;
   }
 
-  //
-  // Method that updates min and index values in proper device memory block
-  // locations.
-  //
-  // Note: only operates on device.
-  //
+  /*!
+   * \brief Method that updates min and index values.
+   *
+   * Note: only operates on device.
+   */
   __device__ ReduceMinLoc<cuda_reduce<BLOCK_SIZE, Async>, T> const &minloc(
       T val,
       Index_type idx) const
@@ -1553,24 +1652,45 @@ public:
   }
 
 private:
-  //
-  // Default ctor is declared private and not implemented.
-  //
+  /*!
+   * \brief Default constructor is declared private and not implemented.
+   */
   ReduceMinLoc<cuda_reduce<BLOCK_SIZE, Async>, T>();
 
+  /*!
+   * \brief Pointer to host tally block cache slot for this reduction variable.
+   */
   CudaReductionLocTallyType<T> *m_tally_host = nullptr;
 
+  /*!
+   * \brief Pointer to device data block for this reduction variable.
+   */
   CudaReductionLocBlockType<T> *m_blockdata = nullptr;
 
+  /*!
+   * \brief Pointer to device tally block slot for this reduction variable.
+   */
   CudaReductionLocTallyType<T> *m_tally_device = nullptr;
 
+  /*!
+   * \brief My cuda reduction variable ID.
+   */
   int m_myID = -1;
 
+  /*!
+   * \brief Byte offset into dynamic shared memory.
+   */
   int m_smem_offset = -1;
 
-  bool m_is_copy = false;
+  /*!
+   * \brief If this variable is a copy or not; only original may release memory 
+   *        or perform finalization.
+   */
+  bool m_is_copy_host = false;
+  bool m_is_copy_device = false;
+  bool m_finish_reduction = false;
 
-  // Sanity checks for block size
+  // Sanity checks for block size and template type size
   static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
   static constexpr bool reasonableRangeCheck =
       ((BLOCK_SIZE >= 32) && (BLOCK_SIZE <= 1024));
@@ -1583,8 +1703,7 @@ private:
   static_assert(powerOfTwoCheck, "Error: block sizes must be a power of 2");
   static_assert(reasonableRangeCheck,
                 "Error: block sizes must be between 32 and 1024");
-  static_assert(
-      sizeofcheck,
+  static_assert(sizeofcheck,
       "Error: type must be of size <= " MACROSTR(RAJA_CUDA_REDUCE_VAR_MAXSIZE));
 };
 
@@ -1601,14 +1720,15 @@ template <size_t BLOCK_SIZE, bool Async, typename T>
 class ReduceMaxLoc<cuda_reduce<BLOCK_SIZE, Async>, T>
 {
 public:
-  //
-  // Constructor takes initial reduction value (default ctor is disabled).
-  //
-  // Note: Ctor only executes on the host.
-  //
+  /*!
+   * \brief Constructor takes initial reduction value (default constructor
+   * is disabled).
+   *
+   * Note: Constructor only executes on the host.
+   */
   explicit ReduceMaxLoc(T init_val, Index_type init_loc)
   {
-    m_is_copy = false;
+    m_is_copy_host = false;
     m_myID = getCudaReductionId();
     getCudaReductionMemBlock(m_myID, (void **)&m_blockdata);
     getCudaReductionTallyBlock(m_myID,
@@ -1616,38 +1736,31 @@ public:
                                (void **)&m_tally_device);
     m_tally_host->tally.val = init_val;
     m_tally_host->tally.idx = init_loc;
-    m_tally_host->maxGridSize = static_cast<GridSizeType>(0);
     m_tally_host->retiredBlocks = static_cast<GridSizeType>(0);
   }
 
-  //
-  // Copy ctor executes on both host and device.
-  //
+  /*!
+   * \brief Initialize shared memory on device, request shared memory on host.
+   *
+   * Copy constructor executes on both host and device.
+   * On host requests dynamic shared memory and gets offset into dynamic
+   * shared memory if in forall.
+   * On device initializes dynamic shared memory to appropriate value.
+   */
   __host__ __device__
   ReduceMaxLoc(const ReduceMaxLoc<cuda_reduce<BLOCK_SIZE, Async>, T> &other)
   {
     *this = other;
-    m_is_copy = true;
 #if defined(__CUDA_ARCH__)
+    m_is_copy_device = true;
+    m_finish_reduction = !other.m_is_copy_device;
     extern __shared__ unsigned char sd_block[];
     T *sd_val = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
     Index_type *sd_idx = reinterpret_cast<Index_type *>(
         &sd_block[m_smem_offset + sizeof(T) * BLOCK_SIZE]);
 
-    int blockId = blockIdx.x + blockIdx.y * gridDim.x
-                  + gridDim.x * gridDim.y * blockIdx.z;
-
     int threadId = threadIdx.x + blockDim.x * threadIdx.y
                    + (blockDim.x * blockDim.y) * threadIdx.z;
-
-    int threads = blockDim.x * blockDim.y * blockDim.z;
-    int blocks = gridDim.x * gridDim.y * gridDim.z;
-
-    if (blockId + threadId == 0) {
-      assert(threads <= BLOCK_SIZE);
-      m_tally_device->maxGridSize =
-          RAJA_MAX(blocks, m_tally_device->maxGridSize);
-    }
 
     // initialize shared memory
     T val = m_tally_device->tally.val;
@@ -1666,86 +1779,39 @@ public:
 
     __syncthreads();
 #else
+    m_is_copy_host = true;
     m_smem_offset =
-        getCudaSharedmemOffset(m_myID,
-                               (sizeof(T) + sizeof(Index_type)) * BLOCK_SIZE);
+        getCudaSharedmemOffset(m_myID, BLOCK_SIZE, 
+                               (sizeof(T) + sizeof(Index_type)));
 #endif
   }
 
-  //
-  // Destruction on host releases the global shared memory block chunk for
-  // reduction id and id itself for others to use.
-  //
-  // Note: destructor executes on both host and device.
-  //
+  /*!
+   * \brief Finish reduction on device and free memory on host.
+   *
+   * Destruction on host releases the global memory block chunk for
+   * reduction id and id itself for others to use.
+   * Destruction on device completes the reduction.
+   *
+   * Note: destructor executes on both host and device.
+   */
   __host__ __device__ ~ReduceMaxLoc<cuda_reduce<BLOCK_SIZE, Async>, T>()
   {
 #if defined(__CUDA_ARCH__)
-    extern __shared__ unsigned char sd_block[];
-    T *sd_val = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
-    Index_type *sd_idx = reinterpret_cast<Index_type *>(
-        &sd_block[m_smem_offset + sizeof(T) * BLOCK_SIZE]);
+    if (m_finish_reduction) {
+      extern __shared__ unsigned char sd_block[];
+      T *sd_val = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
+      Index_type *sd_idx = reinterpret_cast<Index_type *>(
+          &sd_block[m_smem_offset + sizeof(T) * BLOCK_SIZE]);
 
-    int blockId = blockIdx.x + blockIdx.y * gridDim.x
-                  + gridDim.x * gridDim.y * blockIdx.z;
+      int blockId = blockIdx.x + blockIdx.y * gridDim.x
+                    + gridDim.x * gridDim.y * blockIdx.z;
 
-    int blocks = gridDim.x * gridDim.y * gridDim.z;
+      int blocks = gridDim.x * gridDim.y * gridDim.z;
 
-    int threadId = threadIdx.x + blockDim.x * threadIdx.y
-                   + (blockDim.x * blockDim.y) * threadIdx.z;
+      int threadId = threadIdx.x + blockDim.x * threadIdx.y
+                     + (blockDim.x * blockDim.y) * threadIdx.z;
 
-    __syncthreads();
-
-    for (int i = BLOCK_SIZE / 2; i >= WARP_SIZE; i /= 2) {
-      if (threadId < i) {
-        RAJA_CUDA_MAXLOC(sd_val[threadId],
-                         sd_idx[threadId],
-                         sd_val[threadId],
-                         sd_idx[threadId],
-                         sd_val[threadId + i],
-                         sd_idx[threadId + i]);
-      }
-      __syncthreads();
-    }
-
-    for (int i = WARP_SIZE / 2; i > 0; i /= 2) {
-      if (threadId < i) {
-        RAJA_CUDA_MAXLOC(sd_val[threadId],
-                         sd_idx[threadId],
-                         sd_val[threadId],
-                         sd_idx[threadId],
-                         sd_val[threadId + i],
-                         sd_idx[threadId + i]);
-      }
-    }
-
-    bool lastBlock = false;
-    if (threadId < 1) {
-      m_blockdata->values[blockId] = sd_val[threadId];
-      m_blockdata->indices[blockId] = sd_idx[threadId];
-
-      __threadfence();
-      unsigned int oldBlockCount =
-          atomicInc((unsigned int *)&m_tally_device->retiredBlocks,
-                    (blocks - 1));
-      lastBlock = (oldBlockCount == (blocks - 1));
-    }
-    lastBlock = __syncthreads_or(lastBlock);
-
-    if (lastBlock) {
-      CudaReductionLocType<T> lmax{sd_val[0], sd_idx[0]};
-
-      int threads = blockDim.x * blockDim.y * blockDim.z;
-      for (int i = threadId; i < blocks; i += threads) {
-        RAJA_CUDA_MAXLOC(lmax.val,
-                         lmax.idx,
-                         lmax.val,
-                         lmax.idx,
-                         m_blockdata->values[i],
-                         m_blockdata->indices[i]);
-      }
-      sd_val[threadId] = lmax.val;
-      sd_idx[threadId] = lmax.idx;
       __syncthreads();
 
       for (int i = BLOCK_SIZE / 2; i >= WARP_SIZE; i /= 2) {
@@ -1771,32 +1837,83 @@ public:
         }
       }
 
+      bool lastBlock = false;
       if (threadId < 1) {
-        RAJA_CUDA_MAXLOC(m_tally_device->tally.val,
-                         m_tally_device->tally.idx,
-                         m_tally_device->tally.val,
-                         m_tally_device->tally.idx,
-                         sd_val[threadId],
-                         sd_idx[threadId]);
+        m_blockdata->values[blockId] = sd_val[threadId];
+        m_blockdata->indices[blockId] = sd_idx[threadId];
+
+        __threadfence();
+        unsigned int oldBlockCount =
+            atomicInc((unsigned int *)&m_tally_device->retiredBlocks,
+                      (blocks - 1));
+        lastBlock = (oldBlockCount == (blocks - 1));
+      }
+      lastBlock = __syncthreads_or(lastBlock);
+
+      if (lastBlock) {
+        CudaReductionLocType<T> lmax{sd_val[0], sd_idx[0]};
+
+        int threads = blockDim.x * blockDim.y * blockDim.z;
+        for (int i = threadId; i < blocks; i += threads) {
+          RAJA_CUDA_MAXLOC(lmax.val,
+                           lmax.idx,
+                           lmax.val,
+                           lmax.idx,
+                           m_blockdata->values[i],
+                           m_blockdata->indices[i]);
+        }
+        sd_val[threadId] = lmax.val;
+        sd_idx[threadId] = lmax.idx;
+        __syncthreads();
+
+        for (int i = BLOCK_SIZE / 2; i >= WARP_SIZE; i /= 2) {
+          if (threadId < i) {
+            RAJA_CUDA_MAXLOC(sd_val[threadId],
+                             sd_idx[threadId],
+                             sd_val[threadId],
+                             sd_idx[threadId],
+                             sd_val[threadId + i],
+                             sd_idx[threadId + i]);
+          }
+          __syncthreads();
+        }
+
+        for (int i = WARP_SIZE / 2; i > 0; i /= 2) {
+          if (threadId < i) {
+            RAJA_CUDA_MAXLOC(sd_val[threadId],
+                             sd_idx[threadId],
+                             sd_val[threadId],
+                             sd_idx[threadId],
+                             sd_val[threadId + i],
+                             sd_idx[threadId + i]);
+          }
+        }
+
+        if (threadId < 1) {
+          RAJA_CUDA_MAXLOC(m_tally_device->tally.val,
+                           m_tally_device->tally.idx,
+                           m_tally_device->tally.val,
+                           m_tally_device->tally.idx,
+                           sd_val[threadId],
+                           sd_idx[threadId]);
+        }
       }
     }
 #else
-#endif
-
-    if (!m_is_copy) {
-#if defined(__CUDA_ARCH__)
-#else
+    if (!m_is_copy_host) {
       releaseCudaReductionTallyBlock(m_myID);
       releaseCudaReductionId(m_myID);
-#endif
     }
+#endif
+
+    
   }
 
-  //
-  // Operator that returns reduced min value.
-  //
-  // Note: accessor only executes on host.
-  //
+  /*!
+   * \brief Operator that returns reduced min value.
+   *
+   * Note: accessor only executes on host.
+   */
   operator T()
   {
     if (Async) {
@@ -1804,22 +1921,21 @@ public:
     } else {
       beforeCudaReadTallyBlock(m_myID);
     }
-    assert(m_tally_host->maxGridSize <= RAJA_CUDA_REDUCE_BLOCK_LENGTH);
     return m_tally_host->tally.val;
   }
 
-  //
-  // Method that returns reduced min value.
-  //
-  // Note: accessor only executes on host.
-  //
+  /*!
+   * \brief Method that returns reduced min value.
+   *
+   * Note: accessor only executes on host.
+   */
   T get() { return operator T(); }
 
-  //
-  // Method that returns index value corresponding to the reduced max.
-  //
-  // Note: accessor only executes on host.
-  //
+  /*!
+   * \brief Method that returns index value corresponding to the reduced max.
+   *
+   * Note: accessor only executes on host.
+   */
   Index_type getLoc()
   {
     if (Async) {
@@ -1827,16 +1943,14 @@ public:
     } else {
       beforeCudaReadTallyBlock(m_myID);
     }
-    assert(m_tally_host->maxGridSize <= RAJA_CUDA_REDUCE_BLOCK_LENGTH);
     return m_tally_host->tally.idx;
   }
 
-  //
-  // Method that updates max and index values in proper device memory block
-  // locations.
-  //
-  // Note: only operates on device.
-  //
+  /*!
+   * \brief Method that updates max and index values.
+   *
+   * Note: only operates on device.
+   */
   __device__ ReduceMaxLoc<cuda_reduce<BLOCK_SIZE, Async>, T> const &maxloc(
       T val,
       Index_type idx) const
@@ -1859,24 +1973,45 @@ public:
   }
 
 private:
-  //
-  // Default ctor is declared private and not implemented.
-  //
+  /*!
+   * \brief Default constructor is declared private and not implemented.
+   */
   ReduceMaxLoc<cuda_reduce<BLOCK_SIZE, Async>, T>();
 
+  /*!
+   * \brief Pointer to host tally block cache slot for this reduction variable.
+   */
   CudaReductionLocTallyType<T> *m_tally_host = nullptr;
 
+  /*!
+   * \brief Pointer to device data block for this reduction variable.
+   */
   CudaReductionLocBlockType<T> *m_blockdata = nullptr;
 
+  /*!
+   * \brief Pointer to device tally block slot for this reduction variable.
+   */
   CudaReductionLocTallyType<T> *m_tally_device = nullptr;
 
+  /*!
+   * \brief My cuda reduction variable ID.
+   */
   int m_myID = -1;
 
+  /*!
+   * \brief Byte offset into dynamic shared memory.
+   */
   int m_smem_offset = -1;
 
-  bool m_is_copy = false;
+  /*!
+   * \brief If this variable is a copy or not; only original may release memory 
+   *        or perform finalization.
+   */
+  bool m_is_copy_host = false;
+  bool m_is_copy_device = false;
+  bool m_finish_reduction = false;
 
-  // Sanity checks for block size
+  // Sanity checks for block size and template type size
   static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
   static constexpr bool reasonableRangeCheck =
       ((BLOCK_SIZE >= 32) && (BLOCK_SIZE <= 1024));
@@ -1889,8 +2024,7 @@ private:
   static_assert(powerOfTwoCheck, "Error: block sizes must be a power of 2");
   static_assert(reasonableRangeCheck,
                 "Error: block sizes must be between 32 and 1024");
-  static_assert(
-      sizeofcheck,
+  static_assert(sizeofcheck,
       "Error: type must be of size <= " MACROSTR(RAJA_CUDA_REDUCE_VAR_MAXSIZE));
 };
 

@@ -58,6 +58,8 @@
 //
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
+#include <cassert>
+
 #include "RAJA/int_datatypes.hxx"
 
 #include "RAJA/exec-cuda/MemUtils_CUDA.hxx"
@@ -357,8 +359,8 @@ struct ForallN_Executor<ForallN_PolicyPair<CudaPolicy<CuARG0>, ISET0>,
   {
     cudaLauncherN<<<dims.num_blocks,
                     dims.num_threads,
-                    getCudaSharedmemAmount(),
-                    0>>>(body, cargs...);
+                    getCudaSharedmemAmount(dims.num_blocks, dims.num_threads)
+                    >>>(body, cargs...);
     cudaErrchk(cudaPeekAtLastError());
     cudaErrchk(cudaDeviceSynchronize());
   }
@@ -381,8 +383,8 @@ struct ForallN_Executor<ForallN_PolicyPair<CudaPolicy<CuARG0>, ISET0>> {
 
     cudaLauncherN<<<dims.num_blocks,
                     dims.num_threads,
-                    getCudaSharedmemAmount(),
-                    0>>>(body, c0);
+                    getCudaSharedmemAmount(dims.num_blocks, dims.num_threads)
+                    >>>(body, c0);
     cudaErrchk(cudaPeekAtLastError());
     cudaErrchk(cudaDeviceSynchronize());
   }

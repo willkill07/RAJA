@@ -98,6 +98,12 @@ namespace
                           + (threadIdx.y * blockDim.x) + threadIdx.x;
     return threadId;
   }
+  __device__ Index_type getGlobalNumThreads_3D_3D()
+  {
+    Index_type numThreads = blockDim.x * blockDim.y * blockDim.z * 
+                            gridDim.x * gridDim.y * gridDim.z;
+    return numThreads;
+  }
 }
 
 /*!
@@ -116,7 +122,8 @@ __global__ void forall_cuda_kernel(LOOP_BODY loop_body,
   auto body = loop_body;
 
   Index_type ii = getGlobalIdx_3D_3D();
-  if (ii < length) {
+  Index_type numThreads = getGlobalNumThreads_3D_3D();
+  for (; ii < length; ii += numThreads) {
     body(idx[ii]);
   }
 }
@@ -140,7 +147,8 @@ __global__ void forall_Icount_cuda_kernel(LOOP_BODY loop_body,
   auto body = loop_body;
 
   Index_type ii = getGlobalIdx_3D_3D();
-  if (ii < length) {
+  Index_type numThreads = getGlobalNumThreads_3D_3D();
+  for (; ii < length; ii += numThreads) {
     body(ii + icount, idx[ii]);
   }
 }
@@ -166,15 +174,17 @@ RAJA_INLINE void forall(cuda_exec<BLOCK_SIZE, Async>,
   auto end = std::end(iter);
   Index_type len = std::distance(begin, end);
 
-  size_t gridSize = (len + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  size_t gridSize = 
+      RAJA_MIN((len + BLOCK_SIZE - 1) / BLOCK_SIZE, RAJA_CUDA_MAX_NUM_BLOCKS);
 
   RAJA_FT_BEGIN;
 
   forall_cuda_kernel<<<gridSize, 
                        BLOCK_SIZE, 
-                       getCudaSharedmemAmount()>>>(std::move(body),
-                                                   std::move(begin),
-                                                   len);
+                       getCudaSharedmemAmount(gridSize, BLOCK_SIZE)
+                       >>>(std::move(body), 
+                           std::move(begin),
+                           len);
 
   cudaErrchk(cudaPeekAtLastError());
   if (!Async) {
@@ -201,16 +211,18 @@ RAJA_INLINE void forall_Icount(cuda_exec<BLOCK_SIZE, Async>,
   auto end = std::end(iter);
   Index_type len = std::distance(begin, end);
 
-  size_t gridSize = (len + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  size_t gridSize = 
+      RAJA_MIN((len + BLOCK_SIZE - 1) / BLOCK_SIZE, RAJA_CUDA_MAX_NUM_BLOCKS);
 
   RAJA_FT_BEGIN;
 
   forall_Icount_cuda_kernel<<<gridSize,
                               BLOCK_SIZE,
-                              getCudaSharedmemAmount()>>>(std::move(body),
-                                                          std::move(begin),
-                                                          len,
-                                                          icount);
+                              getCudaSharedmemAmount(gridSize, BLOCK_SIZE)
+                              >>>(std::move(body),
+                                  std::move(begin),
+                                  len,
+                                  icount);
 
   cudaErrchk(cudaPeekAtLastError());
   if (!Async) {
