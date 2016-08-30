@@ -79,98 +79,23 @@ namespace RAJA
  ******************************************************************************
  */
 
-  template <typename Reducer, typename T>
-  class UnaryReducer<seq_reduce, Reducer, T>
-  {
-    explicit UnaryReducer(type init_val = Reducer<T>::init())
-      {
-        m_is_copy = false;
-        m_reduced_val = init_val;
-        m_myID = getCPUReductionId();
-        m_blockdata = getCPUReductionMemBlock(m_myID);
-        m_blockdata[0] = init_val;
-      }
-
-    //
-    // Copy ctor.
-    //
-    UnaryReducer(const UnaryReducer<seq_reduce, Reducer, T>& other)
-      {
-        *this = other;
-        m_is_copy = true;
-      }
-
-    //
-    // Destruction releases the shared memory block chunk for reduction id
-    // and id itself for others to use.
-    //
-    ~UnaryReducer<seq_reduce, Reducer, T>()
-      {
-        if (!m_is_copy) {
-          releaseCPUReductionId(m_myID);
-        }
-      }
-
-  //
-  // Operator that returns reduced min value.
-  //
-  operator T() {
-    m_reduced_val = Reducer<T>::apply (m_reduced_val, static_cast<T>(m_blockdata[0]));
-    return m_reduced_val;
-  }
-
-  //
-  // Method that returns reduced min value.
-  //
-  T get() { return operator T(); }
-
-  //
-  // Method that updates min value.
-  //
-  UnaryReducer<seq_reduce, Reducer, T> apply(T val) const
-  {
-        m_blockdata[0] = Reducer<T::apply (static_cast<T>(m_blockdata[0]), val);
-    return *this;
-  }
-
-private:
-  //
-  // Default ctor is declared private and not implemented.
-  //
-  UnaryReducer<seq_reduce, Reducer T>();
-
-  bool m_is_copy;
-  int m_myID;
-
-  T m_reduced_val;
-
-  CPUReductionBlockDataType* m_blockdata;
-  };
-
-template <typename T>
-class ReduceMin<seq_reduce, T> : public UnaryReducer<seq_reduce, RAJA::internal::Reduction::Min, T>
+template <typename Reducer>
+class UnaryReducer<seq_reduce, Reducer>
 {
-public:
-  //
-  // Constructor takes default value (default ctor is disabled).
-  //
-  explicit ReduceMin(T init_val)
+  using T = Reducer::type;
+
+  explicit UnaryReducer(T init_val = Reducer::init())
+      : m_is_copy{false},
+        m_reduced_val{init_val},
+        m_myID{getCPUReductionId()},
+        m_blockdata{getCPUReductionMemBlock(m_myID)}
   {
-    m_is_copy = false;
-
-    m_reduced_val = init_val;
-
-    m_myID = getCPUReductionId();
-
-    m_blockdata = getCPUReductionMemBlock(m_myID);
-
     m_blockdata[0] = init_val;
   }
-
   //
   // Copy ctor.
   //
-  ReduceMin(const ReduceMin<seq_reduce, T>& other)
+  UnaryReducer(const UnaryReducer<seq_reduce, Reducer>& other)
   {
     *this = other;
     m_is_copy = true;
@@ -180,49 +105,73 @@ public:
   // Destruction releases the shared memory block chunk for reduction id
   // and id itself for others to use.
   //
-  ~ReduceMin<seq_reduce, T>()
+  ~UnaryReducer<seq_reduce, Reducer>()
   {
     if (!m_is_copy) {
       releaseCPUReductionId(m_myID);
     }
   }
 
-  //
-  // Operator that returns reduced min value.
-  //
   operator T()
   {
-    m_reduced_val = RAJA_MIN(m_reduced_val, static_cast<T>(m_blockdata[0]));
-
+    m_reduced_val =
+        Reducer::apply(m_reduced_val, static_cast<T>(m_blockdata[0]));
     return m_reduced_val;
   }
 
-  //
-  // Method that returns reduced min value.
-  //
   T get() { return operator T(); }
 
   //
   // Method that updates min value.
   //
-  ReduceMin<seq_reduce, T> min(T val) const
+  UnaryReducer<seq_reduce, Reducer> apply(T val) const
   {
-    m_blockdata[0] = RAJA_MIN(static_cast<T>(m_blockdata[0]), val);
+    m_blockdata[0] = Reducer::apply(static_cast<T>(m_blockdata[0]), val);
     return *this;
   }
 
 private:
-  //
-  // Default ctor is declared private and not implemented.
-  //
-  ReduceMin<seq_reduce, T>();
-
   bool m_is_copy;
   int m_myID;
-
   T m_reduced_val;
-
   CPUReductionBlockDataType* m_blockdata;
+};
+
+template <typename T>
+class ReduceMin<seq_reduce, T>
+    : public UnaryReducer<seq_reduce, RAJA::internal::Reduction::Min<T>>
+{
+  using Base = UnaryReducer<seq_reduce, RAJA::internal::Reduction::Min<T>>;
+
+public:
+  ReduceMin() : Base() {}
+  ReduceMin(T init_val) : Base(init_val) {}
+  ReduceMin(const ReduceMin<seq_reduce, T>& other) : Base(other) {}
+};
+
+
+template <typename T>
+class ReduceMax<seq_reduce, T>
+    : public UnaryReducer<seq_reduce, RAJA::internal::Reduction::Max<T>>
+{
+  using Base = UnaryReducer<seq_reduce, RAJA::internal::Reduction::Max<T>>;
+
+public:
+  ReduceMax() : Base() {}
+  ReduceMax(T init_val) : Base(init_val) {}
+  ReduceMax(const ReduceMax<seq_reduce, T>& other) : Base(other) {}
+};
+
+template <typename T>
+class ReduceSum<seq_reduce, T>
+    : public UnaryReducer<seq_reduce, RAJA::internal::Reduction::Sum<T>>
+{
+  using Base = UnaryReducer<seq_reduce, RAJA::internal::Reduction::Sum<T>>;
+
+public:
+  ReduceSum() : Base() {}
+  ReduceSum(T init_val) : Base(init_val) {}
+  ReduceSum(const ReduceSum<seq_reduce, T>& other) : Base(other) {}
 };
 
 /*!
@@ -333,92 +282,6 @@ private:
   Index_type* m_idxdata;
 };
 
-/*!
- ******************************************************************************
- *
- * \brief  Max reducer class template for use in sequential reduction.
- *
- *         For usage example, see reducers.hxx.
- *
- ******************************************************************************
- */
-template <typename T>
-class ReduceMax<seq_reduce, T>
-{
-public:
-  //
-  // Constructor takes default value (default ctor is disabled).
-  //
-  explicit ReduceMax(T init_val)
-  {
-    m_is_copy = false;
-
-    m_reduced_val = init_val;
-
-    m_myID = getCPUReductionId();
-
-    m_blockdata = getCPUReductionMemBlock(m_myID);
-
-    m_blockdata[0] = init_val;
-  }
-
-  //
-  // Copy ctor.
-  //
-  ReduceMax(const ReduceMax<seq_reduce, T>& other)
-  {
-    *this = other;
-    m_is_copy = true;
-  }
-
-  //
-  // Destruction releases the shared memory block chunk for reduction id
-  // and id itself for others to use.
-  //
-  ~ReduceMax<seq_reduce, T>()
-  {
-    if (!m_is_copy) {
-      releaseCPUReductionId(m_myID);
-    }
-  }
-
-  //
-  // Operator that returns reduced max value.
-  //
-  operator T()
-  {
-    m_reduced_val = RAJA_MAX(m_reduced_val, static_cast<T>(m_blockdata[0]));
-
-    return m_reduced_val;
-  }
-
-  //
-  // Method that returns reduced max value.
-  //
-  T get() { return operator T(); }
-
-  //
-  // Method that updates max value.
-  //
-  ReduceMax<seq_reduce, T> max(T val) const
-  {
-    m_blockdata[0] = RAJA_MAX(static_cast<T>(m_blockdata[0]), val);
-    return *this;
-  }
-
-private:
-  //
-  // Default ctor is declared private and not implemented.
-  //
-  ReduceMax<seq_reduce, T>();
-
-  bool m_is_copy;
-  int m_myID;
-
-  T m_reduced_val;
-
-  CPUReductionBlockDataType* m_blockdata;
-};
 
 /*!
  ******************************************************************************
@@ -528,94 +391,6 @@ private:
   Index_type* m_idxdata;
 };
 
-/*!
- ******************************************************************************
- *
- * \brief  Sum reducer class template for use in sequential reduction.
- *
- *         For usage example, see reducers.hxx.
- *
- ******************************************************************************
- */
-template <typename T>
-class ReduceSum<seq_reduce, T>
-{
-public:
-  //
-  // Constructor takes default value (default ctor is disabled).
-  //
-  explicit ReduceSum(T init_val)
-  {
-    m_is_copy = false;
-
-    m_init_val = init_val;
-    m_reduced_val = static_cast<T>(0);
-
-    m_myID = getCPUReductionId();
-
-    m_blockdata = getCPUReductionMemBlock(m_myID);
-
-    m_blockdata[0] = 0;
-  }
-
-  //
-  // Copy ctor.
-  //
-  ReduceSum(const ReduceSum<seq_reduce, T>& other)
-  {
-    *this = other;
-    m_is_copy = true;
-  }
-
-  //
-  // Destruction releases the shared memory block chunk for reduction id
-  // and id itself for others to use.
-  //
-  ~ReduceSum<seq_reduce, T>()
-  {
-    if (!m_is_copy) {
-      releaseCPUReductionId(m_myID);
-    }
-  }
-
-  //
-  // Operator that returns reduced sum value.
-  //
-  operator T()
-  {
-    m_reduced_val = m_init_val + static_cast<T>(m_blockdata[0]);
-
-    return m_reduced_val;
-  }
-
-  //
-  // Method that returns reduced sum value.
-  //
-  T get() { return operator T(); }
-
-  //
-  // += operator that adds value to sum.
-  //
-  ReduceSum<seq_reduce, T> operator+=(T val) const
-  {
-    m_blockdata[0] += val;
-    return *this;
-  }
-
-private:
-  //
-  // Default ctor is declared private and not implemented.
-  //
-  ReduceSum<seq_reduce, T>();
-
-  bool m_is_copy;
-  int m_myID;
-
-  T m_init_val;
-  T m_reduced_val;
-
-  CPUReductionBlockDataType* m_blockdata;
-};
 
 }  // closing brace for RAJA namespace
 
