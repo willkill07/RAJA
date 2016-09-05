@@ -5,7 +5,7 @@
 .. ##
 .. ## All rights reserved.
 .. ##
-.. ## For details and restrictions, please read the README-license.txt file.
+.. ## For release details and restrictions, please see the RAJA/LICENSE file.
 .. ##
 
 
@@ -96,6 +96,5 @@ interested in improving RAJA and exploring new ways to use it.
    basic_examples
    advanced_examples
    config_build
-   dev_guide
    future
    raja_license

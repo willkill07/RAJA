@@ -5,7 +5,7 @@
 .. ##
 .. ## All rights reserved.
 .. ##
-.. ## For details and restrictions, please read the README-license.txt file.
+.. ## For release details and restrictions, please see the RAJA/LICENSE file.
 .. ##
 
 

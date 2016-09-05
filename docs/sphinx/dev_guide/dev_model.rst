@@ -1,0 +1,25 @@
+.. ##
+.. ## Copyright (c) 2016, Lawrence Livermore National Security, LLC.
+.. ##
+.. ## Produced at the Lawrence Livermore National Laboratory.
+.. ##
+.. ## All rights reserved.
+.. ##
+.. ## For release details and restrictions, please see the RAJA/LICENSE file.
+.. ##
+
+*********************************
+RAJA Development
+*********************************
+
+======================================================
+Branch Development Model
+======================================================
+
+======================================================
+Code Reviews and Acceptance
+======================================================
+
+======================================================
+Versioning
+======================================================
