@@ -13,7 +13,7 @@ RAJA Coding Guidelines
 *********************************
 
 ======================================================
-1 Purpose of the guidelines and general considerations
+0 Purpose of the guidelines and general considerations
 ======================================================
 
 These guidelines define code style conventions for RAJA development. 
@@ -41,6 +41,16 @@ Each guideline in this document has one of three qualifiers:
 Whether and how to apply items having "should" or "may" qualifiers may depend
 on the particular code situation. They should be used in a manner that helps
 to enhance code readability and help reduce user and developer errors.
+
+
+=========================================================
+1 General guidelines
+=========================================================
+
+1.1 When modifying an existing code file, the style conventions already being 
+    used in the file **must** be followed. While we don't want to stifle
+    personal creativity, mixing style conventions is disruptive and may cause
+    confusion for users and fellow developers.
 
 
 ========
