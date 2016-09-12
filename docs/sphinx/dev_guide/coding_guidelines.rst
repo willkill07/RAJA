@@ -38,8 +38,9 @@ Each guideline in this document has one of three qualifiers:
 * A "should" item is a strong recommendation. 
 * A "may" item is a potentially beneficial stylistic suggestion. 
 
-Items having "should" and "may" qualifiers may be situation-dependent. Their
-application should serve to enhance code readability and help reduce errors.
+Whether and how to apply items having "should" or "may" qualifiers may depend
+on the particular code situation. They should be used in a manner that helps
+to enhance code readability and help reduce user and developer errors.
 
 
 ========
@@ -48,21 +49,21 @@ application should serve to enhance code readability and help reduce errors.
 
 This section contains guidelines for naming files, types (i.e., classes,
 structs, etc.), functions, data members, variables, etc. The main goal is
-to use a distinct and consistent naming convention for each item category
-so that the role of each entity in the code is obvious from the form of
-its name.
+to use a distinct and consistent naming convention for each item so that 
+the role of each entity in the code is obvious from the form of its name.
 
 -----------
 2.1 General
 -----------
 
-2.1.1 Every name **must** be meaningful. That is, its meaning **must** be clear to other code developers and users, not just the author of the name.
+2.1.1 Every name **must** be meaningful. That is, its meaning **must** be clear to other code developers and users, not just the author of the code in which
+the name is introduced.
 
       A substantial benefit of good name selection is that it can greatly
-      reduce the amount of source code documentation required for others to
+      reduce the amount of code documentation required for others to
       understand it. For example, when the name of a function clearly indicates
       what it does and the meaning and purpose of each argument is clear from
-      its name, then code comments may be unnecessary. In fact, documenting
+      its name, then code comments may be unnecessary. Indeed, documenting
       "the obvious" is often more distracting than helpful.
 
 2.1.2 Each name **must** be consistent with other similar names in the code.
@@ -71,7 +72,9 @@ its name.
       and "setFoo" respectively, then adding a new setter method called
       "putBar" is clearly inconsistent.
 
-2.1.3 Tersely abbreviated or cryptic or names **should** be avoided. However, common acronyms and jargon that are well understood by team members **may** be used.
+2.1.3 Tersely abbreviated or cryptic names **should** be avoided. However, 
+common acronyms and jargon that are well understood by team members and
+users **may** be used.
 
 --------------
 2.2 File names
@@ -80,97 +83,124 @@ its name.
 In this section and throughout the guidelines, we refer to "header" and
 "source" files. Header files are those that are included in other files
 (either header or source). Source files are not included in other files and
-form translation units when a program is compiled. Also, header files often
-do not contain implementations, only function declarations and type definitions.Common exceptions include class template header files and headers that contain
-inline functions. Such files must contain implementations.
+form distinct translation units when a program is compiled. Also, many 
+header files often do not contain implementations, only function declarations 
+and type definitions. However, RAJA header files contain many templates and
+inline functions. Header files with such entities must contain those 
+implementations.
 
-2.2.1 C++ header and source file extensions **must** be: \*.hpp and \*.cpp, respectively.
+2.2.1 C++ header and source file extensions **must** be: \*.hxx and \*.cxx, 
+respectively.
 
-2.2.2 C-only header and source file extensions **must** be: \*.h and \*.c, respectively.
-
-2.2.3 The name of each file **must** clearly indicate its contents.
+2.2.2 The name of each file **must** clearly indicate its contents.
 
       In partciular, a header file that defines a major type (e.g., a struct or
       class) or contains function signatures associated with a major type
       **must** include the type name in the file name. For example, the header
-      file for the class "MyClass" should be named "MyClass.hpp".
+      file for the class "MyClass" should be named "MyClass.hxx".
 
       Similarly, a source file that implements functionality associated with
       a major type, such as a class implementation file, **must** include
       the type name in the file name. For example, the source file for the
-      class "MyClass" should be named "MyClass.cpp".
+      class "MyClass" should be named "MyClass.cxx".
 
-2.2.4 Header and source files that provide a limited, well-defined set of code functionality, but are not associated with a major data type, **must** be named so that the contents of the file are clear from the name.
+2.2.3 Header and source files that do not directly define or implement a 
+major data type, such as a class, **must** be named so that the contents 
+of the file are clear from its name. Such a file **should** contain a limited, 
+well-defined set of code functionality and/or concepts.
 
       For example, header and source files containing unbound utility methods
-      for dealing with file I/O **should** be named "FileUtils.hpp" and
-      "FileUtils.cpp", or similar.
+      for dealing with file I/O **should** be named "FileIO.hxx" and
+      "FileUtils.cxx", or similar.
 
-2.2.5 File names that differ only in letter case **must** not be used.
+2.2.4 File names that differ only in letter case **must** not be used.
 
-      For example, having files with names "MyClass.hpp" and "myclass.hpp"
-      is not acceptable.
+      Since we aim to support Windows platforms, which has limited case
+      sensitivity for file names, having files with names "MyClass.hxx" 
+      and "myclass.hxx", for example, is not acceptable. 
 
 
 ------------------------
 2.3 Scope and type names
 ------------------------
 
-2.3.1 All namespaces defined in the Toolkit **must** use all lowercase letters.
+2.3.1 Type names (i.e., classes, structs, typedefs, enums, etc.) used in RAJA
+**must** be nouns and **should** be in mixed case with each word starting with 
+an upper case letter and all other letters in lower cases.
 
-      For example, most C++ entities in the CS Toolkit are inluded in the
-      namespace "asctoolkit"; for example::
+      For example, these are preferred type names::
 
-         namespace asctoolkit {
-              // . . .
-         }
+         IndexSet, RangeSegment, PolicyBase
 
-2.3.2 All type names (i.e., classes, structs, typedefs, enums, etc.) **must** be nouns and **must** be in mixed case with each word starting with an upper case
-letter and all other letters in lower case.
+      These names are not preferred type names::
 
-      For example, these are acceptable type names::
+         indexSet, rangesegment, POLICYBASE
 
-         Line, BankAccount, MyNiftyClass
+2.3.3 Separating characters, such as underscores, **should** not be used 
+between words in a type name.
 
-      These are not acceptable type names::
+      For example, these names are not preferred type names::
 
-         line, LINE, Bankaccount, myNiftyClass
+         Index_set, Range-Segment
 
-2.3.3 Separating characters, such as underscores, **should** not be used between words in a type name.
+     **Exceptions to the guidelines above** include cases where RAJA types
+     play a similar role to those used commonly. For example, RAJA has 
+     iterator classes, such as "base_iterator" and "numeric_iterator". These 
+     names are acceptable since they are consistent with those found in the 
+     C++ standard library.
 
-      For example, these are not acceptable type names::
+2.3.4 Suffixes that may be used by compilers for name mangling, or which are 
+used in the C++ standard library, such as "\_t", **must** not be used in 
+RAJA type names.
 
-         Bank_Account, My-Nifty-Class
-
-2.3.4 Suffixes that may be used by compilers for name mangling, or which are used in the C or C++ standard libraries, such as "\_t", **must** not be used in type names.
 
 ------------------------
 2.4 Function names
 ------------------------
 
-2.4.1 Function names **must** use "camelCase " style.
+2.4.1 The name of a function **must** clearly indicate what the function does.
 
-      Specifically, the first word must be in lower case letters. If
-      multiple words are used, each word after the first must start with
-      an upper case letter and have all other letters in lower case.
-      Underscores must not be used in camelCase, but numbers may be
-      used.
+2.4.2 Function names **should** begin with a verb.
 
-      For example, these are acceptable camelCase style function names::
-
-         compAverage(), getName(), copy2()
-
-2.4.2 All functions names (i.e., class members, unbound methods, etc.) **must** begin with a verb and clearly indicate what they do.
-
-2.4.3 Complementary verbs (e.g., "get/set", "add/remove", "create/destroy") **must** be used for routines that perform complementary operations.
+2.4.3 Complementary verbs (e.g., "get/set", "add/remove", "create/destroy") 
+      **must** be used for routines that perform complementary operations.
 
       Such symmetry prevents confusion and makes interfaces easier to use.
 
-2.4.4 Verbs (e.g., "is", "has", "can") **must** be used for any function with a boolean return type (including an int value indicating true/false).
+2.4.4 Verbs such as "is", "has", "can", etc. **should** be used for functions 
+      with a boolean return type.
 
-      For example, use::
+      For example, the following names are preferred::
 
-         isInitialized(), hasLicense(), canEvaluate()
+         isInitialized(), isAllocated()
+
+2.4.5 Function names **must** use "camelCase" or "pot_hole" style.
+
+      **camelCase style:** The first word must use all lower case letters.
+      If multiple words are used, each word after the first must start with
+      an upper case letter and have all other letters in the word in lower case.
+      Underscores must not be used in camelCase, but numbers may be used.
+
+      For example, these are proper camelCase names::
+
+         getLength(), createView()
+
+      **pot_hole style:** All letters must be in lower case. If multiple
+      words are used, they must be separated by a single underscore. Numbers
+      may be used in pothole style names.
+
+      For example, these are acceptable pothole style variable names::
+
+         push_front(), push_back()
+
+2.4.6 Names of related functions, such as methods for a class, **should** 
+      follow the same style.
+ 
+     **Exceptions: While consistency is important, name style may be mixed 
+     when it makes sense to do so. For example, most methods for a class may 
+     follow camelCase style. But, that same class may also contain methods 
+     that follow pot_hole style if those methods perform operations that are
+     similar to C++ standard library functions.
 
 
 -----------------------------------
