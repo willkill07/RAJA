@@ -87,14 +87,14 @@ int main(int argc, char *argv[])
 
       double dtinit = 5.0;
 
-      ReduceSum<cuda_reduce<block_size>, double> dsum0(0.0);
-      ReduceSum<cuda_reduce<block_size>, double> dsum1(dtinit * 1.0);
-      ReduceSum<cuda_reduce<block_size>, double> dsum2(0.0);
-      ReduceSum<cuda_reduce<block_size>, double> dsum3(dtinit * 3.0);
-      ReduceSum<cuda_reduce<block_size>, double> dsum4(0.0);
-      ReduceSum<cuda_reduce<block_size>, double> dsum5(dtinit * 5.0);
-      ReduceSum<cuda_reduce<block_size>, double> dsum6(0.0);
-      ReduceSum<cuda_reduce<block_size>, double> dsum7(dtinit * 7.0);
+      ReduceSum<cuda_reduce<block_size, Register>, double> dsum0(0.0);
+      ReduceSum<cuda_reduce<block_size, Register>, double> dsum1(dtinit * 1.0);
+      ReduceSum<cuda_reduce<block_size, Register>, double> dsum2(0.0);
+      ReduceSum<cuda_reduce<block_size, Register>, double> dsum3(dtinit * 3.0);
+      ReduceSum<cuda_reduce<block_size, Register>, double> dsum4(0.0);
+      ReduceSum<cuda_reduce<block_size, Register>, double> dsum5(dtinit * 5.0);
+      ReduceSum<cuda_reduce<block_size, Register>, double> dsum6(0.0);
+      ReduceSum<cuda_reduce<block_size, Register>, double> dsum7(dtinit * 7.0);
 
       int loops = 2;
       for (int k = 0; k < loops; k++) {

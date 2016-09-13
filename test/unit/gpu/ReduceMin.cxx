@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
 
       double BIG_MIN = -500.0;
       ReduceMin<cuda_reduce<block_size>, double> dmin0(DBL_MAX);
-      ReduceMin<cuda_reduce<block_size>, double> dmin1(DBL_MAX);
+      ReduceMin<cuda_reduce<block_size, Register>, double> dmin1(DBL_MAX);
       ReduceMin<cuda_reduce<block_size>, double> dmin2(BIG_MIN);
 
       int loops = 16;

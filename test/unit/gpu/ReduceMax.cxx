@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
 
       double BIG_MAX = 500.0;
       ReduceMax<cuda_reduce<block_size>, double> dmax0(-DBL_MAX);
-      ReduceMax<cuda_reduce<block_size>, double> dmax1(-DBL_MAX);
+      ReduceMax<cuda_reduce<block_size, Register>, double> dmax1(-DBL_MAX);
       ReduceMax<cuda_reduce<block_size>, double> dmax2(BIG_MAX);
 
       int loops = 16;
