@@ -136,6 +136,11 @@ using cuda_exec_async = cuda_exec<BLOCK_SIZE, true>;
 // NOTE: There is no Index set segment iteration policy for CUDA
 //
 
+enum Reduction_Implementation {
+  Shared,
+  Register
+};
+
 ///
 ///////////////////////////////////////////////////////////////////////
 ///
@@ -143,19 +148,25 @@ using cuda_exec_async = cuda_exec<BLOCK_SIZE, true>;
 ///
 ///////////////////////////////////////////////////////////////////////
 ///
-template <size_t BLOCK_SIZE, bool Async = false>
+template <size_t BLOCK_SIZE, 
+          Reduction_Implementation Impl = Shared, 
+          bool Async = false>
 struct cuda_reduce {
 };
 ///
-template <size_t BLOCK_SIZE, bool Async = false>
+template <size_t BLOCK_SIZE, 
+          Reduction_Implementation Impl = Shared, 
+          bool Async = false>
 struct cuda_reduce_atomic {
 };
 ///
-template <size_t BLOCK_SIZE>
-using cuda_reduce_async = cuda_reduce<BLOCK_SIZE, true>;
+template <size_t BLOCK_SIZE,
+          Reduction_Implementation Impl = Shared>
+using cuda_reduce_async = cuda_reduce<BLOCK_SIZE, Impl, true>;
 ///
-template <size_t BLOCK_SIZE>
-using cuda_reduce_atomic_async = cuda_reduce_atomic<BLOCK_SIZE, true>;
+template <size_t BLOCK_SIZE,
+          Reduction_Implementation Impl = Shared>
+using cuda_reduce_atomic_async = cuda_reduce_atomic<BLOCK_SIZE, Impl, true>;
 
 
 //
