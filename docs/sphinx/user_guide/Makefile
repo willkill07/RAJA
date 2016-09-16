@@ -32,7 +32,7 @@ gh-pages: _build/html
 	touch .nojekyll && \
 	git init && \
 	git add . && \
-	git commit -m "Spack Documentation" && \
+	git commit -m "RAJA User Documentation" && \
 	git push -f $$root master:gh-pages && \
 	rm -rf .git
 
