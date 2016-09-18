@@ -15,7 +15,7 @@ RAJA Testing
 *********************************
 
 RAJA developers use three different test suites to verify RAJA is correct
-and performing as expected.
+and performs as expected.
 
 ======================================================
 Unit Tests
@@ -23,9 +23,9 @@ Unit Tests
 
 The RAJA repository contains a collection of simple unit tests that
 exercise basic functionality for all constructs and execution policies
-that RAJA supports. They provide a `zeroth-order` check to make sure 
+that RAJA supports. These test provide a `zeroth-order` check to make sure 
 RAJA is built correctly and nothing obvious is broken. These tests are 
-built by default when RAJA is compiled. To execute these tests, simply 
+built by default when RAJA is compiled. To execute the unit tests, simply 
 enter the directory where RAJA is built and run them. For example:
 
 .. code-block:: sh
@@ -34,25 +34,25 @@ enter the directory where RAJA is built and run them. For example:
     $ make               // build RAJA
     $ make test          // run tests
 
-RAJA unit tests use Google Test and CTest. So when the tests are run as
-above, much of the test output is suppressed. Specifically, you will only
-see summary output indicating whether each unit test set passed or failed. 
-More detailed information about individual tests can be observed if you 
-run them directly and individually. The unit test executables are located 
+RAJA unit tests use CTest. So when the tests are run as
+above, the output of individual tests is suppressed. Specifically, you will 
+only see summary output indicating whether each unit test set passed or failed. 
+More detailed information about individual tests can be observed by running
+them directly and individually. The unit test executables are located 
 in sub-directories of the test directory in the RAJA build space.
 
-**It is important to note that the number of unit tests run will vary 
-depending on which programming model backends RAJA is configured to 
-support. As more options are enabled, more execution policies will be
-exercised; thus, more tests will be run.**
+**It is important to note that the number of unit tests run varies
+depending on how RAJA is configured for compilation. As more programming
+model backend options are enabled, for example, more execution policies will 
+be exercised; thus, more tests will be run.**
 
 
 ======================================================
 Integration Tests
 ======================================================
 
-More complex tests that begin to represent how RAJA would be integrated
-into an application are provided in the 
+More complex tests that begin to represent RAJA integration into an 
+application are provided in the 
 `RAJA example repository <https://github.com/LLNL/RAJA-examples>`_.
 This repo contains RAJA variants of several proxy applications, such
 as `LULESH <https://codesign.llnl.gov/lulesh.php>`_ and 

@@ -11,20 +11,20 @@
 RAJA Developers' Guide
 =========================================================
 
-This document describes key aspects of the RAJA development process and 
-provides a basic set of code development guidelines for RAJA. The intent 
-is have a lightweight set of common prctices that help to ensure that RAJA 
-code is robust, easily understood, developed consistently, and tested and 
-documented well. Folks who contribute to RAJA development should be 
+This guide describes key aspects of the RAJA development process and 
+provides a basic set of codingg guidelines for RAJA. The intent 
+is that all RAJA code is written following some core practices to ensure 
+that RAJA code is developed consistently, easily understood, tested and 
+documented well, and robust. Folks who contribute to RAJA should be 
 aware of and follow these guidelines. 
 
 The guidelines are not meant to be static, but rather to evolve with the 
-needs of the project and should be changed as needed. Changes should
-be based on development team discussion using the collective professional 
-judgment of team members. Also, the benefits of uniformity should be balanced
-with variations that allow for individual stylistic preferences and which may
-be preferable in certain circumstances. When changes are made, these
-guidelines should be updated accordingly. 
+project and improved as needed. Changes should be agreed to by the 
+core developers and based on their collective professional judgment. 
+Also, the benefits of uniformity should be balanced with allowances for 
+individual stylistic preferences, which may be preferable in certain 
+circumstances. When changes are made, these guidelines should be updated 
+accordingly. 
 
 
 **Contents:**
