@@ -16,9 +16,9 @@ RAJA Coding Guidelines
 0 Purpose of the guidelines and general considerations
 ======================================================
 
-These guidelines define code style conventions for RAJA development. 
-Most of the guidelines were taken from the cited references, sometimes 
-with modifications and simplifications.
+These guidelines define code style conventions for RAJA. Most of the 
+guidelines were taken from the cited references, sometimes with 
+modifications and simplifications; see :ref:`codingrefs-label`.
 
 The guidelines emphasize code readability, correctness, portability, and 
 interoperability. Agreement on coding style and following common idioms 
@@ -31,46 +31,56 @@ common concerns. Some of these guidelines are arbitrary, but all are based
 on practical experience and widely accepted sound practices. For brevity, 
 most guidelines contain little detailed explanation or justification. 
 
-Each guideline in this document has one of three qualifiers: 
+Each guideline is qualified by one of three auxiliary verbs: 
 "must", "should", or "may". 
 
 * A "must" item is an absolute requirement. 
 * A "should" item is a strong recommendation. 
 * A "may" item is a potentially beneficial stylistic suggestion. 
 
-Whether and how to apply items having "should" or "may" qualifiers may depend
-on the particular code situation. They should be used in a manner that helps
-to enhance code readability and help reduce user and developer errors.
+Whether and how to apply items qualified with "should" or "may" often depends
+on the particular code situation. It is best to use them in a manner that
+enhances code readability and help to reduce user and developer errors.
 
 
 =========================================================
 1 General guidelines
 =========================================================
 
-1.1 When modifying an existing code file, the style conventions already being 
-    used in the file **must** be followed. While we don't want to stifle
-    personal creativity, mixing style conventions is disruptive and may cause
-    confusion for users and fellow developers.
+1.1 When modifying an existing code file, the style conventions already in
+    use in the file **must** be followed. This guideline is not intended to
+    stifle personal creativity - mixing style conventions is disruptive and 
+    may cause confusion for users and fellow developers.
+
+1.2 The contents of each file **must** be limited and well-defined so that
+    the file can be named so that it clearly indicates its contents. The goal 
+    is to prevent a file from becoming bloated with too many or diverse 
+    concepts.
 
 
 ========
 2 Names
 ========
 
-This section contains guidelines for naming files, types (i.e., classes,
-structs, etc.), functions, data members, variables, etc. The main goal is
-to use a distinct and consistent naming convention for each item so that 
-the role of each entity in the code is obvious from the form of its name.
+This section contains guidelines for naming files, types. functions, 
+class members, variables, etc. The main goal is to use a distinct and 
+consistent naming convention for each item so that the role of each entity 
+in the code is obvious from the form of its name.
 
 -----------
 2.1 General
 -----------
 
-2.1.1 Every name **must** be meaningful. That is, its meaning **must** be clear to other code developers and users, not just the author of the code in which
-the name is introduced.
+2.1.1 Good Names are essential to sound software design. Each name associated
+to a software construct **must** be defined clearly and multiple names **must**
+not be used to refer to the same concept. 
+
+2.1.2 Every name **must** be meaningful. Its meaning **must** be clear
+to other code developers and users, not just the author of the name.
 
       A substantial benefit of good name selection is that it can greatly
-      reduce the amount of code documentation required for others to
+      reduce the amount of developer debate to define a concepts. A good name
+      also tends to reduce the amount of documentation required for others to
       understand it. For example, when the name of a function clearly indicates
       what it does and the meaning and purpose of each argument is clear from
       its name, then code comments may be unnecessary. Indeed, documenting
@@ -93,35 +103,29 @@ users **may** be used.
 In this section and throughout the guidelines, we refer to "header" and
 "source" files. Header files are those that are included in other files
 (either header or source). Source files are not included in other files and
-form distinct translation units when a program is compiled. Also, many 
-header files often do not contain implementations, only function declarations 
-and type definitions. However, RAJA header files contain many templates and
-inline functions. Header files with such entities must contain those 
-implementations.
+form distinct translation units when a program is compiled.
 
 2.2.1 C++ header and source file extensions **must** be: \*.hxx and \*.cxx, 
 respectively.
 
-2.2.2 The name of each file **must** clearly indicate its contents.
+2.2.2 Header and source files that are closely related, such as a header file
+containing prototypes for a set of methods and a source file containing
+implementations of those methods **must** be named the same (excluding file
+extensions) or sufficiently similar so that their relationship is clear.
 
-      In partciular, a header file that defines a major type (e.g., a struct or
-      class) or contains function signatures associated with a major type
-      **must** include the type name in the file name. For example, the header
-      file for the class "MyClass" should be named "MyClass.hxx".
+2.2.3 The name of each file **must** clearly indicate its contents.
 
-      Similarly, a source file that implements functionality associated with
-      a major type, such as a class implementation file, **must** include
-      the type name in the file name. For example, the source file for the
-      class "MyClass" should be named "MyClass.cxx".
+      For example, the header and source file containing the definition and
+      implementation of a major type, such as a class **must** include the 
+      type name of the type in the file name. For example, the header and
+      implementation file for a class called "MyClass" should be named 
+      "MyClass.hxx" and "MyClass.cxx", respectively.
 
-2.2.3 Header and source files that do not directly define or implement a 
-major data type, such as a class, **must** be named so that the contents 
-of the file are clear from its name. Such a file **should** contain a limited, 
-well-defined set of code functionality and/or concepts.
-
-      For example, header and source files containing unbound utility methods
-      for dealing with file I/O **should** be named "FileIO.hxx" and
-      "FileUtils.cxx", or similar.
+      Files that are not associated with a single type, but which contain 
+      closely related functionality or concepts, **must** be named so that
+      the functionality or concepts are clear from the name. For example,
+      files that define and implement methods that handle file I/O **should** 
+      be named "FileIO.hxx" and "FileUtils.cxx", or similar.
 
 2.2.4 File names that differ only in letter case **must** not be used.
 
@@ -134,45 +138,45 @@ well-defined set of code functionality and/or concepts.
 2.3 Scope and type names
 ------------------------
 
-2.3.1 Type names (i.e., classes, structs, typedefs, enums, etc.) used in RAJA
-**must** be nouns and **should** be in mixed case with each word starting with 
+2.3.1 Type names (i.e., classes, structs, typedefs, enums, etc.) **must** be 
+nouns and **should** be in mixed case with each word starting with 
 an upper case letter and all other letters in lower cases.
 
       For example, these are preferred type names::
 
          IndexSet, RangeSegment, PolicyBase
 
-      These names are not preferred type names::
+      These type names should not be used::
 
          indexSet, rangesegment, POLICYBASE
 
-2.3.3 Separating characters, such as underscores, **should** not be used 
+2.3.2 Separating characters, such as underscores, **should** not be used 
 between words in a type name.
 
       For example, these names are not preferred type names::
 
-         Index_set, Range-Segment
+         Index_set, Range_Segment
 
-     **Exceptions to the guidelines above** include cases where RAJA types
-     play a similar role to those used commonly. For example, RAJA has 
-     iterator classes, such as "base_iterator" and "numeric_iterator". These 
-     names are acceptable since they are consistent with those found in the 
-     C++ standard library.
+     **Exceptions to the guidelines above** include cases where types
+     play a similar role to those in common use elsewhere. For example, RAJA 
+     has iterator classes, such as "base_iterator" and "numeric_iterator". 
+     These names are acceptable since they are consistent with those found 
+     in the C++ standard library.
 
-2.3.4 Suffixes that may be used by compilers for name mangling, or which are 
-used in the C++ standard library, such as "\_t", **must** not be used in 
-RAJA type names.
+2.3.3 Name suffixes that may be used by compilers for name mangling, or 
+which are used in the C++ standard library, such as "\_t", **must** not be 
+used in RAJA type names.
 
 
 ------------------------
 2.4 Function names
 ------------------------
 
-2.4.1 The name of a function **must** clearly indicate what the function does.
+2.4.1 Each function **must** be named to clearly indicate what it does.
 
 2.4.2 Function names **should** begin with a verb.
 
-2.4.3 Complementary verbs (e.g., "get/set", "add/remove", "create/destroy") 
+2.4.3 Complementary verbs such as  "get/set", "add/remove" and "create/destroy"
       **must** be used for routines that perform complementary operations.
 
       Such symmetry prevents confusion and makes interfaces easier to use.
@@ -186,72 +190,66 @@ RAJA type names.
 
 2.4.5 Function names **must** use "camelCase" or "pot_hole" style.
 
-      **camelCase style:** The first word must use all lower case letters.
-      If multiple words are used, each word after the first must start with
-      an upper case letter and have all other letters in the word in lower case.
-      Underscores must not be used in camelCase, but numbers may be used.
+      **camelCase style:** The first word has all lower case letters.
+      If multiple words are used, each word after the first starts with
+      an upper case letter and all other letters in the word are lower case.
+      Underscores must not be used in camelCase names, but numbers may be used.
 
       For example, these are proper camelCase names::
 
-         getLength(), createView()
+         getLength(), createView2()
 
-      **pot_hole style:** All letters must be in lower case. If multiple
-      words are used, they must be separated by a single underscore. Numbers
+      **pot_hole style:** All letters are lower case. If multiple
+      words are used, they are separated by a single underscore. Numbers
       may be used in pothole style names.
 
       For example, these are acceptable pothole style variable names::
 
-         push_front(), push_back()
+         push_front(), push_back_2()
 
 2.4.6 Names of related functions, such as methods for a class, **should** 
       follow the same style.
  
-     **Exceptions: While consistency is important, name style may be mixed 
-     when it makes sense to do so. For example, most methods for a class may 
-     follow camelCase style. But, that same class may also contain methods 
-     that follow pot_hole style if those methods perform operations that are
-     similar to C++ standard library functions.
+      **Exceptions: While consistency is important, name style may be mixed 
+      when it makes sense to do so. For example, most methods for a class may 
+      follow camelCase style. But, that same class may also contain methods 
+      that follow pot_hole style if those methods perform operations that are
+      similar to C++ standard library functions.
 
 
 -----------------------------------
 2.5 Data member and variable names
 -----------------------------------
 
-2.5.1 Variable names (e.g., class members, struct fields, function arguments, local variables) **must** use either "camelCase" style or "pot_hole" style. Within a Toolkit component, one consistent style **must** be used.
+2.5.1 Variables that are function arguments or function-scoped variables 
+**must** use either "camelCase" style or "pot_hole" style. Pot_hole style 
+is preferred; camelCase is acceptable. 
 
-      **camelCase style:** The first word must be in lower case letters.
-      If multiple words are used, each word after the first must start with
-      an upper case letter and have all other letters in lower case.
-      Underscores must not be used in camelCase, but numbers may be used.
+      For example, these are acceptable variable names::
 
-      For example, these are acceptable camelCase style variable names::
+         myAverage, person_name, pressure2
 
-         myAverage, personName, pressure2
-
-      **pot_hole style:** All letters must be in lower case. If multiple
-      words are used, they must be separated by a single underscore. Numbers
-      may be used in pothole style names.
-
-      For example, these are acceptable pothole style variable names::
-
-         my_average, person_name, pressure_2
-
-2.5.2 Class and struct data member names **must** use one of the two prefixes: "m\_" and "s\_".
+2.5.2 Class and struct data member names **must** use one of the two prefixes: 
+"m\_" and "s\_".
 
       The prefix "m\_" indicates a regular data member and the prefix "s\_"
       indicates a static member.
 
       This convention makes it obvious which variable names in the code refer
-      to class members/struct fields and which are local variables. For example,      the following are acceptable names for class data members using
+      to class members/struct fields and which are local variables. For 
+      example, the following are acceptable names for class data members using
       camelCase style::
 
          m_myAverage, m_personName
 
-      and pothole style::
+      and acceptable pothole style::
 
          m_my_average, m_person_name
 
-2.5.3 Verbs, such as "is", "has", "can", etc., **must** be used for each boolean variables, such as type bool or an integer that indicate true/false values.
+      Similarly, for static members.s
+
+2.5.3 Verbs, such as "is", "has", "can", etc., **must** be used for boolean 
+variables (i.e., either type bool or an integer that indicates true/false).
 
       For example, use::
 
@@ -261,7 +259,8 @@ RAJA type names.
 
          m_initialized, license
 
-2.5.4 Local variables, such as loop indices, **should** be named so they are easy to search for using a text editor.
+2.5.4 Local variables, such as loop indices, **should** be named so they are 
+easy to search for using a text editor.
 
       For example, a loop index named "ivar" is easier to search for than
       one named simply "i".
@@ -281,11 +280,16 @@ RAJA type names.
 2.6 Macros and enumeration constants
 ------------------------------------
 
-2.6.1 Preprocessor macro constants **must** be named using all uppercase letters and underscores should be used between words.
+2.6.1 Preprocessor macro constants **must** be named using all uppercase 
+letters and underscores should be used between words.
 
-      For example,::
+      For example, these are acceptable macro names::
 
          MAX_ITERATIONS, READ_MODE
+
+      These are not acceptable::
+
+         maxiterations, readMode
 
 2.6.2 The name of each enumeration value **should** start with a capital letter and use an underscore between words when multiple words are used.
 
@@ -303,11 +307,9 @@ RAJA type names.
 3 Directories, Files, and Scope
 =====================================
 
-This section contains some basic directory and file organization guidelines.
-While each toolkit component may establish its own directory structure,
-following these guidelines will help make it easy to locate a specific file
-and, once the file is found, to locate essential information in it easily
-and quickly.
+This section contains basic directory and file organization guidelines.
+These guidelines help make it easy to locate a specific file and, once 
+the file is found, to locate essential information in it easily and quickly.
 
 
 -------------------------------------
@@ -317,18 +319,23 @@ and quickly.
 It is common practice for C++ libraries to have header files and associated
 implementation files located in the same directory. We follow this practice.
 
-3.1.1 Each file **must** reside in a directory that corresponds to the code functionality supported by the contents of the file.
+3.1.1 Each file **must** reside in a directory that corresponds to the code 
+functionality supported by the contents of the file.
 
-3.1.2 Each source directory **must** be named so that the collective purpose of the files it contains is clear. Each directory name **must** be in all lower case letters and should consist of a single word with no non-alphabetic characters.
+3.1.2 Each source directory **must** be named so that the collective purpose 
+of the files it contains is clear. Each directory name **must** be in all 
+lower case letters and should consist of a single word with no non-alphabetic 
+characters.
 
 
 ---------------------------------------------------------
-3.2 Header file (\*.hpp extension) content organization
+3.2 Header file (\*.hxx extension) content organization
 ---------------------------------------------------------
 
-This section contains guidelines for C++ header files (with "\*.hpp" extension).
+Header file content **must** be organized consistently across all header files.
 The file layout summary here uses numbers and text to illustrate the basic
 structure. Details about individual items follow.
+The following summarizes RAJA header file organizion:
 
 .. code-block:: cpp
 
@@ -343,17 +350,16 @@ structure. Details about individual items follow.
    // (4) Header file inclusions (when NEEDED in lieu of forward declarations)
    #include "..."
 
-   // (5) Forward declarations NEEDED in header file (outside of asctoolkit
-   namespace)
+   // (5) Forward declarations NEEDED in header file (outside of RAJA namespace)
    class ...;
 
-   // (6a) "asctoolkit" namespace declaration
-   namespace asctoolkit {
+   // (6a) "RAJA" namespace declaration
+   namespace RAJA {
 
-   // (7a) Toolkit component namespace (if used); e.g.,
+   // (7a) RAJA internal namespace (if used); e.g.,
    namespace awesome {
 
-   // (8) Forward declarations NEEDED in header file (in toolkit namespace(s)
+   // (8) Forward declarations NEEDED in header file (in RAJA namespace(s)
    class ...;
 
    // (9) Type definitions (class, enum, etc.) with Doxygen comments e.g.,
@@ -366,11 +372,11 @@ structure. Details about individual items follow.
       ...
    } MyClass;
 
-   // (7b) Toolkit component namespace closing brace (if needed)
+   // (7b) RAJA internal namespace closing brace (if needed)
    } // awesome namespace closing brace
 
-   // (6b) "asctoolkit namespace closing brace
-   } // asctoolkit namespace closing brace
+   // (6b) "RAJA namespace closing brace
+   } // RAJA namespace closing brace
 
    // (3b) Header file include guard closing endif */
    #endif // closing endif for header file include guard
@@ -378,15 +384,18 @@ structure. Details about individual items follow.
 The numbers in parentheses in the following guidelines correspond to the
 numbered items in the comments in the preceding summary.
 
-3.2.1 Each header file **must** begin with a comment section containing the LLNL copyright statement (item 1 in summary).
+3.2.1 Each header file **must** begin with a comment section containing the 
+RAJA LLNL copyright statement (item 1 in summary).
 
       See Section 4 for details.
 
-3.2.2 A Doxygen file prologue (item 2 in summary) **should** follow the copyright statement.
+3.2.2 A Doxygen file prologue (item 2 in summary) **should** follow the 
+copyright statement.
 
       See Section 4 for details.
 
-3.2.3 The contents of each C++ header file **must** be guarded using a preprocessor directive that defines a unique "guard name" for the header file.
+3.2.3 The contents of each header file **must** be guarded using a preprocessor
+directive that defines a unique "guard name" for the header file.
 
       The guard must appear immediately after the file prologue and use the
       '#ifndef' directive (item 3a in summary); this requires a closing
@@ -394,29 +403,35 @@ numbered items in the comments in the preceding summary.
       preprocessor constant must use the file name followed by "_HPP"; e.g.,
       "MYCLASS_HPP" as above.
 
-3.2.4 All necessary header file include statements (item 4 in summary) **must** appear immediately after definition of the header guard and before any forward
-declarations, type definitions, etc.
+3.2.4 All necessary header file include statements (item 4 in summary) **must** 
+appear immediately after the definition of the header guard and before any 
+forward declarations, type definitions, etc.
 
-3.2.5 Any necessary forward declarations (item 5 in summary) for types defined outside the toolkit namespace **must** appear before the toolkit namespace statement.
+3.2.5 Any necessary forward declarations (item 5 in summary) for types defined 
+outside the RAJA namespace **must** appear before the RAJA namespace statement.
 
-3.2.6 All types defined and methods defined in a C++ header file **must** be included in a namespace.
+3.2.6 All types defined and methods defined in a header file **must** be 
+included in a namespace.
 
-      Either the main "asctoolkit" namespace (item 6a in summary) or a toolkit
-      component namespace (item 7a in summary) may be used, or both may be
-      used. A closing brace ( "}" ) is required to close each namespace
-      declaration (items 6b and 7b) before the closing '#endif' for the header
-      file include guard.
+      Either the main "RAJA" namespace (item 6a in summary) or a namespace
+      nested within the RAJA namespace (item 7a in summary) may be used, or 
+      both may be used. A closing brace ( "}" ) is required to close each
+       namespace declaration (items 6b and 7b) before the closing '#endif' 
+      for the header file include guard.
 
-3.2.7 Forward declarations for types defined in the toolkit, and which are needed for the header file, **must** appear first in the "asctoolkit" or nested namespace before any other statements (item 8 in summary).
+3.2.7 Forward declarations needed for a header file, **must** appear first in 
+the "RAJA" or nested namespace before any other statements (item 8 in summary).
 
-3.2.8 All class and other type definitions (item 9 in summary) **must** appear after the header file inclusions and forward declarations. A proper class prologue **must** appear before the class definition; see Section 4 for details.
+3.2.8 All class and other type definitions (item 9 in summary) **must** appear 
+after header file inclusions and forward declarations. A proper class prologue 
+**must** appear before the class definition; see Section 4 for details.
 
 
 ---------------------------------------------------------
-3.3 Source file (\*.cpp extension) content organization
+3.3 Source file (\*.cxx extension) content organization
 ---------------------------------------------------------
 
-This section contains guidelines for C++ source files (with "\*.cpp" extension).
+This section contains guidelines for source files (with "\*.cxx" extension).
 The file layout summary here uses numbers and text to illustrate the basic
 structure. Details about individual items follow.
 
@@ -427,10 +442,10 @@ structure. Details about individual items follow.
    // (2) Header file inclusions (only those that are NECESSARY)
    #include "..."
 
-   // (3a) "asctoolkit" namespace declaration
-   namespace asctoolkit {
+   // (3a) "RAJA" namespace declaration
+   namespace RAJA {
 
-   // (4a) Toolkit component namespace (if used); e.g.,
+   // (4a) Internal namespace (if used); e.g.,
    namespace awesome {
 
    // (5) Initialization of static class data members, if any; e.g.,
@@ -440,29 +455,34 @@ structure. Details about individual items follow.
 
    // (7) Implementation of non-static class members and other methods
 
-   // (4b) Toolkit component namespace closing brace (if needed)
+   // (4b) Internal namespace closing brace (if needed)
    } // awesome namespace closing brace
 
-   // (3b) "asctoolkit namespace closing brace
+   // (3b) RAJA namespace closing brace
    } // asctoolkit namespace closing brace
 
 The numbers in parentheses in the following guidelines correspond to the
 numbered items in the comments in the preceding summary.
 
-3.3.1 Each source file **must** begin with a comment section containing the LLNL copyright statement (item 1 in summary).
+3.3.1 Each source file **must** begin with a comment section containing 
+the RAJA copyright statement (item 1 in summary).
 
-3.3.2 All necessary header file include statements (item 2 in summary) **must** appear immediately after the copyright statement and before any actual implementation statements in the file.
+3.3.2 All necessary header file include statements (item 2 in summary) **must**
+appear immediately after the copyright statement and before any implementation 
+statements in the file.
 
-3.3.3 All contents in a C++ source file **must** follow the same namespace inclusion pattern as its corresponding header file (see item 3.4.6).
+3.3.3 All contents in a source file **must** follow the same namespace 
+inclusion pattern as its corresponding header file (see item 3.4.6).
 
-      Either the main "asctoolkit" namespace (item 3a in summary) or a toolkit
-      component namespace (item 4a in summary) may be used, or both may be used.
+      Either the main "RAJA" namespace (item 3a in summary) or internal
+      namespace (item 4a in summary) may be used, or both may be used.
       A closing brace ( "}" ) is required to close each namespace declaration
       (items 3b and 4b) before the closing '#endif' for the header file include
       guard.
 
 3.3.4 When used, static class data members **must** be initialized explicitly
-in the class source file before any member functions are defined (item 5 in summary).
+in the class source file before any member functions are defined (item 5 in 
+summary).
 
 
 ---------------------------------------------------------
@@ -470,14 +490,14 @@ in the class source file before any member functions are defined (item 5 in summ
 ---------------------------------------------------------
 
 Good header file structure and conventions can make a huge positive impact on
-readability, and productivity of software developers. In earlier sections, we
+software understanding and productivity of software developers. Earlier, we
 described basic header file organizational guidelines. In this section, we
 provide additional header file guidelines.
 
-3.4.1 Each source file **must** have an associated header file with a matching name, such as "Foo.hpp" for the source file Foo.cpp".
+3.4.1 Each source file **must** have an associated header file with a matching 
+name, such as "Foo.hxx" for the source file Foo.cxx".
 
-      **Exceptions:** Unit test files and the file containing main do not
-      require headers.
+      **Exceptions:** Unit test files may not require headers.
 
 3.4.2 Header files **may** contain multiple type definitions (e.g., structs, classes, enums, etc.). However, type definitions and function declarations in a header file **must** be related closely and/or support the primary type for which the file is named.
 
@@ -502,10 +522,8 @@ provide additional header file guidelines.
         specialized templates are not templates and so they are treated just
         like any other function.
 
-3.4.4 Header files **should** use forward declarations instead of header file in
-clusions when possible.
-      This avoids having the compiler open more files than are needed, which
-      can speed up recompilation when header files change.
+3.4.4 Header files **should** use forward declarations instead of header file 
+inclusions when possible.This avoids having the compiler open more files than are needed, which can speed up recompilation when header files change.
 
       **Exceptions:**
 
@@ -2270,8 +2288,10 @@ reviewed and approved by all team members.
 7.2.3 Boost usage **must not** be exposed through any public interface in the CS Toolkit. 
 
 
+.. _codingrefs-label:
+
 ======================================
-8 References and useful resources
+References and useful resources
 ======================================
 
 Most of the guidelines here were gathered from the following list sources. 

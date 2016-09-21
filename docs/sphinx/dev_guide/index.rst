@@ -12,19 +12,20 @@ RAJA Developers' Guide
 =========================================================
 
 This guide describes key aspects of the RAJA development process and 
-provides a basic set of codingg guidelines for RAJA. The intent 
-is that all RAJA code is written following some core practices to ensure 
-that RAJA code is developed consistently, easily understood, tested and 
-documented well, and robust. Folks who contribute to RAJA should be 
-aware of and follow these guidelines. 
+provides a basic set of coding guidelines for RAJA. The guide is useful
+for RAJA core developers and contributors and for "on-boarding" new
+team members and contributors. The aim is that all RAJA code is developed
+following similar practices to ensure that it is developed consistently, 
+easily understood and used, tested and documented well, and robust. Anyone 
+who contributes to RAJA should be aware of and follow these guidelines. 
 
-The guidelines are not meant to be static, but rather to evolve with the 
-project and improved as needed. Changes should be agreed to by the 
-core developers and based on their collective professional judgment. 
-Also, the benefits of uniformity should be balanced with allowances for 
-individual stylistic preferences, which may be preferable in certain 
-circumstances. When changes are made, these guidelines should be updated 
-accordingly. 
+The guidelines are not meant to be static, but rather to evolve with
+project needs and improved when there are better ways of doing things. 
+Changes should be agreed to by the core developers after assessing their
+merits based on the teams collective professional judgment. Also, the 
+benefits of uniformity should be balanced with allowances for individual 
+stylistic preferences, which may be preferable in certain situations. 
+When changes are made, these guidelines should be updated accordingly. 
 
 
 **Contents:**
@@ -39,7 +40,7 @@ accordingly.
 Indices and tables
 ==================
 
-* :ref:`genindex`
+* :ref:`Canaanites`
 * :ref:`modindex`
 * :ref:`search`
 
