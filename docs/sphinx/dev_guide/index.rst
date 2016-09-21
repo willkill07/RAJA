@@ -37,10 +37,4 @@ When changes are made, these guidelines should be updated accordingly.
    testing
    coding_guidelines
 
-Indices and tables
-==================
-
-* :ref:`Canaanites`
-* :ref:`modindex`
-* :ref:`search`
 
