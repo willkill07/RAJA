@@ -44,23 +44,24 @@ enhances code readability and help to reduce user and developer errors.
 
 
 =========================================================
-1 General guidelines
+1 General considerations
 =========================================================
+
+1.2 Significant deviations from these guidelines **must** be discussed and
+agreed upon by the development team. If the guidelines need to be changed,
+they **should** be.
 
 1.1 When modifying existing code, the style conventions already in
 use in the file **must** be followed. This is not intended to
 stifle personal creativity - mixing style is disruptive and 
 may cause confusion for users and fellow developers.
 
-1.2 Significant deviations from these guidelines **must** be discussed and
-agreed upon by the development team. If the guidelines need to be changed,
-they **should** be.
-
 
 ========
 2 Names
 ========
 
+Good names are essential to sound software design.
 This section contains guidelines for naming files, types. functions, 
 class members, variables, etc. The main goal is to use a distinct and 
 consistent naming convention for each item so that the role of each entity 
@@ -70,19 +71,8 @@ in the code is obvious from the form of its name.
 2.1 General
 -----------
 
-2.1.1 Good names are essential to sound software design. Terms **must** be 
-clear and well-defined, and terminology **must** be used consistently; 
-i.e., in documentation and for names of directories, types, functions, 
-variables, etc. Multiple terms **should** not be used to refer to the 
-same concept and a concept **should** not be referred to by multiple 
-terms.
-
-      Using a clear, limited set of terminology in a software project helps
-      maintain the consistency and integrity of the software, and it makes
-      the code easier to understand for developers and users.
-
-2.1.2 Every name **must** be meaningful. Its meaning **must** be clear
-to other code developers and users, not just the author of the name.
+2.1.1 Every name **must** be meaningful. In particular, its meaning **must** 
+be clear to other code developers and users, not just the author of the name.
 
       A substantial benefit of good name selection is that it can greatly
       reduce the amount of developer debate to define a concepts. A good name
@@ -93,19 +83,28 @@ to other code developers and users, not just the author of the name.
       can be a substantial part of software and requires maintenance. 
       Minimizing the amount of documentation required reduces this burden.
 
-2.1.2 Each name **must** be consistent with other similar names in the code.
+2.1.2 Terminology **must** be used consistently; i.e., in documentation and 
+for names of directories, types, functions, variables, etc. Multiple terms 
+**should** not be used to refer to the same concept and a concept **should** 
+not be referred to by multiple terms.
+
+      Using a clear, limited set of terminology in a software project helps
+      maintain the consistency and integrity of the software, and it makes
+      the code easier to understand for developers and users.
+
+2.1.3 Each name **must** be consistent with other similar names in the code.
 
       For example, if getter/setter methods follow the convention "getFoo"
       and "setFoo" respectively, then adding a new setter method called
       "putBar" is clearly inconsistent.
 
-2.1.3 Tersely abbreviated or cryptic names **should** be avoided. However, 
+2.1.4 Tersely abbreviated or cryptic names **should** be avoided. However, 
 common acronyms and jargon that are well understood by team members and
 users **may** be used.
 
 
 --------------------
-2.2 Directory names
+2.2 Directories
 --------------------
 
 2.2.1 Each source directory **must** be named so that the collective purpose 
@@ -118,7 +117,7 @@ the same style conventions.
 
 
 --------------
-2.3 File names
+2.3 Files
 --------------
 
 In this section and throughout the guidelines, we refer to "header" and
@@ -129,13 +128,7 @@ form distinct translation units when a program is compiled.
 2.3.1 C++ header and source file extensions **must** be: \*.hxx and \*.cxx, 
 respectively.
 
-2.3.2 Header and source files that are closely related, such as a header file
-containing prototypes for a set of methods and a source file containing
-implementations of those methods **must** be named the same (excluding 
-file extension, of course) or sufficiently similar so that their 
-relationship is clear.
-
-2.3.3 The name of each file **must** clearly indicate its contents.
+2.3.4 The name of each file **must** clearly indicate its contents.
 
       For example, the header and source file containing the definition and
       implementation of a major type, such as a class **must** include the 
@@ -149,6 +142,12 @@ relationship is clear.
       files that define and implement methods that handle file I/O **should** 
       be named "FileIO.hxx" and "FileUtils.cxx", or similar.
 
+2.3.3 Header and source files that are closely related, such as a header file
+containing prototypes for a set of methods and a source file containing
+implementations of those methods **must** be named the same (excluding 
+file extension, of course) or sufficiently similar so that their 
+relationship is clear.
+
 2.3.4 File names that differ only in letter case **must** not be used.
 
       Since we aim to support Windows platforms, which has limited case
@@ -157,7 +156,7 @@ relationship is clear.
 
 
 ------------------------
-2.4 Scope and type names
+2.4 Scopes and types
 ------------------------
 
 2.4.1 Type names (i.e., classes, structs, typedefs, enums, etc.) **must** be 
@@ -191,10 +190,23 @@ be used in RAJA type names.
 
 
 ------------------------
-2.5 Function names
+2.5 Functions
 ------------------------
 
-2.5.1 Each function **must** be named to clearly indicate what it does.
+2.5.1 Each function name **must** indicate clearly indicate what the 
+function does. 
+
+      For example::
+
+        calculateDensity() and getDensity()
+
+      are good function names because they distinguish the fact that the
+      first performs a computation and the second returns a value. If a
+      function were named::
+
+        density()
+
+      what it actually does is murky.
 
 2.5.2 Function names **should** begin with a verb.
 
@@ -210,7 +222,8 @@ with a boolean return type.
 
          isInitialized(), isAllocated()
 
-2.5.5 Function names **must** use "camelCase" or "pot_hole" style.
+2.5.5 Function names **must** use "camelCase" or "pot_hole" style. camelCase 
+is preferred. 
 
       **camelCase style:** The first word has all lower case letters.
       If multiple words are used, each word after the first starts with
@@ -240,12 +253,13 @@ follow the same style.
 
 
 -----------------------------------
-2.6 Data member and variable names
+2.6 Data members and variables
 -----------------------------------
 
-2.6.1 Variables that are function arguments or function-scoped variables 
-**must** use either "camelCase" style or "pot_hole" style. Pot_hole style 
-is preferred; camelCase is acceptable. 
+2.6.1 All variables (class/struct members, function-scoped variables, function
+arguments, etc.) **must** use either "camelCase" style or "pot_hole" style. 
+Pot_hole style is preferred since it distinguishes variable names from 
+method names.
 
        For example, these are acceptable variable names::
 
@@ -254,8 +268,8 @@ is preferred; camelCase is acceptable.
 2.6.2 Non-static class and struct data member names **must** have the 
 prefix "m\_".
 
-      This convention makes it obvious which variable names in the code refer
-      to class members/struct fields and which are other local variables. For 
+      This convention makes it obvious which variables are class 
+      members/struct fields and which are other local variables. For 
       example, the following are acceptable names for class data members using
       camelCase style::
 
@@ -345,7 +359,7 @@ too many or diverse concepts.
 -------------------------------------
 
 3.2.1 Header files and associated implementation files **should** reside in 
-the same directory, which is common practice for C++ libraries, unless
+the same directory, which is a common practice for C++ libraries, unless
 there is a good reason to do otherwise.
 
 3.2.2 Each file **must** reside in the directory that corresponds to the code 
@@ -368,7 +382,7 @@ which the file is named.
 
 3.3.2 A header file **must** be self-contained and self-sufficient.
 
-      Specifically, a header file
+      Specifically, each header file
 
       * **Must** have proper header file include guards 
         (see :ref:`headerorg-label`) to prevent multiple inclusion. The macro 
@@ -389,8 +403,8 @@ which the file is named.
         are treated just like regular functions.
 
 3.3.3 Header files **should** use forward declarations instead of header file 
-inclusions when possible. This prevents a compiler from opening more files 
-than it needs to, which can speed up recompilation when header files change.
+inclusions when possible. This may speed up compilation, especially when 
+recompiling after header files change.
 
       **Exceptions:**
 
@@ -407,11 +421,10 @@ than it needs to, which can speed up recompilation when header files change.
         inclusion of standard headers wherever the header file is used.
 
 3.3.4 A forward type declaration **must** be used in a header file when an 
-include statement would result in a circular dependency among header files 
-or when only the type name is needed and not the type definition.
+include statement would result in a circular dependency among header files. 
 
 3.3.5 Extraneous header files or forward declarations (i.e., those not 
-required for standalone compilation) **should not** be included in header files.
+required for standalone compilation) **must not** be included in header files.
 
       Spurious header file inclusions, in particular, introduce spurious file
       dependencies, which can increase compilation time unnecessarily.
@@ -457,14 +470,16 @@ for all files.
 3.3.7 A "typedef" statement, when used, **should** appear in the header file 
 where the type is defined. 
 
-      This practice helps insure that all names associated with a given type
+      This practice helps ensure that all names associated with a given type
       are available when the appropriate header file is used and eliminates
       potentially inconsistent type names.
 
 3.3.8 Routines **should** be ordered and grouped in a header file so that
 code readability and understanding are enhanced.
 
-      For example, all related methods should be grouped together.
+      For example, all related methods should be grouped together. Also,
+      public methods, which are part of an interface, should appear before 
+      private methods.
 
 3.3.9 The name of each function argument **must** be specified in a header 
 file declaration. Also, names in function declarations and definitions 
@@ -539,8 +554,6 @@ are contained in the guidelines after the summary.
    // (2b) Header file include guard closing endif */
    #endif // closing endif for header file include guard
 
-The numbered item in the summary above are referred to in the following 
-guidelines.
 
 3.4.1 Each header file **must** begin with a Doxygen file prologue (item 1).
 
@@ -599,7 +612,8 @@ name, such as "Foo.hxx" for the source file Foo.cxx".
 
       **Exceptions:** Test files may not require headers.
 
-3.5.2 Unnecessary header files **should not** be included in source files (i.e.,headers not needed to compile the file standalone).
+3.5.2 Unnecessary header files **should not** be included in source files 
+(i.e.,headers not needed to compile the file standalone).
 
       Such header file inclusions introduce spurious file dependencies, which
       may increases compilation time unnecessarily.
@@ -610,7 +624,8 @@ order in which they appear in the associated header file.
       This makes the methods easier to locate and compare with documentation
       in the header file.
 
-3.5.4 Each function implementation in a source file **should** be documented according to the guidelines in Section 4.
+3.5.4 Each function implementation in a source file **should** be documented 
+following to the guidelines in Section 4.
 
 
 .. _sourceorg-label:
@@ -652,8 +667,6 @@ are contained in the guidelines after the summary.
    // (4b) RAJA namespace closing brace
    } // asctoolkit namespace closing brace
 
-The numbered items in the summary above are referred to in the following
-guidelines.
 
 3.6.1 Each source file **must** begin with a Doxygen file prologue (item 1).
 
@@ -882,7 +895,21 @@ subset of Doxygen syntax. The goal of adhering to a small, simple set of
 documentation commands is that developers will be encouraged to build useful 
 documentation when they are writing code.
 
-4.2.1 Doxygen comment blocks for **may** use either JavaDoc, Qt style, or one 
+
+The Doxygen system interprets each documentation comment as either "brief" 
+or "detailed". 
+
+ - A brief comment is a concise statement of purpose for an item (usually no 
+   more than one line) and starts with the Doxygen command "\\brief" 
+   (or "@brief"). Brief comments appear in summary sections of the generated 
+   documentation. They are typically seen before detailed comments when 
+   scanning the documentation; thus good brief comments make it easier to 
+   can or navigate a source code manual.
+
+ - A detailed comment is any comment that is not identified as 'brief'.
+
+
+4.2.1 Doxygen comment blocks **may** use either JavaDoc, Qt style, or one 
 of the C++ comment forms described below.
 
       JavaDoc style comments consist of a C-style comment block starting with
@@ -902,8 +929,7 @@ of the C++ comment forms described below.
       For JavaDoc or Qt style comments, the asterisk characters ("\*") on
       intermediate lines are optional, but encouraged.
 
-      C++ comment forms use either a block of at least two C++ comment lines, 
-      where each line starts with an additional slash::
+      C++ comment block forms start each line with an additional slash::
 
          ///
          /// ...comment text...
@@ -915,15 +941,18 @@ of the C++ comment forms described below.
          //! ...comment text...
          //!
 
+      For these C++ style comment forms, the comment delimiter is required on
+      each line.
+
 4.2.2 Whichever Doxygen comment block style is used, it **must** be the same 
 within a file.
 
 4.2.3 When adding documentation to existing code, the new comments **must** 
 use the same comment forms as the exising documentation.
 
-4.2.4 Most Doxygen comments **should** appear immediately before the items they describe. 
+4.2.4 Most Doxygen comments **should** appear immediately before the items they describe; i.e., no blank lines between comment and item.
 
-      **Exception:** Inline oxygen comments for class/struct data members, 
+      **Exception:** Inline Doxygen comments for class/struct data members, 
       enum values, function arguments, etc. **must** appear after the item 
       **on the same line** and **must** use the following syntax::
 
@@ -934,39 +963,31 @@ use the same comment forms as the exising documentation.
       comment applies to the item immediately preceding the comment. See
       examples in later sections.
 
+4.2.5 When an item is documented using the Doxygen inline form above, the
+comment **should** not span multiple lines.
+
 4.2.5 A "brief" description **should** be provided in the Doxygen comment 
 section for each of the following items: 
 
       * A type definition (i.e., class, struct, typedef, enum, etc.) 
       * A macro definition
-      * A struct field or C++ class data member
-      * A C++ class member function declaration (in the header file class 
+      * A struct field or class data member
+      * A class member function declaration (in the header file class 
         definition) 
       * An unbound function signature (in a header file)
       * A function implementation (when there is no description in the 
         associated header file)
 
-      A brief comment **should** be a concise statement of purpose for an item 
-      (usually no more than one line) and must start with the Doxygen command 
-      "\\brief" (or "@brief").
-
-      The Doxygen system interprets each comment as either "brief" or 
-      "detailed". Brief comments appear in summary sections of the generated 
-      documentation. They are typically seen before detailed comments when 
-      scanning the documentation; thus good brief comments make it easier to 
-      navigate a source code manual.
-
-4.2.6 Important information of a more lengthy nature (e.g., spanning multiple 
-lines) **should** be provided for files, major data types and definitions, 
-functions, etc. when needed. A detailed comment **must** be separated from a 
-brief comment with a blank line.
+4.2.6 Important information of a more lengthy nature (e.g., usage examples
+spanning multiple lines) **should** be provided for files, major data types 
+and definitions, functions, etc. when needed. A detailed comment **must** be 
+separated from a brief comment in the same comment block with a line containing
+no documentation text.
 
 4.2.7 Summary of commonly used Doxygen commands
 
 This Section provides an overview of commonly used Doxygen commands.
-Please see the Doxygen documentation cited in the references at the end of 
-these guidelines for more details and information about other commands 
-that you may find useful.
+Please see the `Doxygen guide <http://www.stack.nl/~dimitri/doxygen/manual/index.html>`_ for more details and information about other commands.
 
 Note that to be processed properly, Doxygen commands **must** be preceded with 
 either "\\" or "\@" character. For brevity, we use "\\" for all commands 
@@ -1007,15 +1028,12 @@ described here.
      organization in the documentation, and also when several items can be 
      documented with a single description (e.g., a set of simple, related 
      functions). 
-
    * **\\verbatim, \\endverbatim** The "verbatim/endverbatim" commands are 
      used to start/stop a block of text that is to appear exactly as it is 
      typed, without additional formatting, in the generated documentation.
-
    * **-** and **-#** The "-" and "-#" symbols begin an item in a bulleted 
      list or numbered list, respectively. In either case, the item ends at 
      the next blank line or next item.
-
    * **\\b** and **\\e** These symbols are used to make the next word bold or 
      emphasized/italicized, respectively, in the generated documentation.
    
@@ -1053,7 +1071,8 @@ can be found in any of the RAJA files.
 4.4 File documentation
 --------------------------------------------------------------------
 
-4.3.1 Each header files that declares unbound functions, defines enums, typedefs, etc. **must** have a Doxygen file prologue similar to the following:
+4.4.1 Each header file that declares a global type, method, etc. **must** 
+have a Doxygen file prologue similar to the following:
 
 .. code-block:: cpp
 
@@ -1066,12 +1085,10 @@ can be found in any of the RAJA files.
     *
     * Optional detailed explanatory notes about the file.
     *
-    * \author Name of file author (optional)
-    *
     ****************************************************************************
     */
 
-4.3.2 The Doxygen command "\\file" **must** appear first in the file prologue.
+4.4.2 The Doxygen command "\\file" **must** appear first in the file prologue.
 
       The "\\file" command identifies the comment section as documentation 
       for the file. Doxygen requires that the file itself must be documented 
@@ -1084,21 +1101,21 @@ can be found in any of the RAJA files.
       the file in which it is located instead of the summary documentation 
       in the listing of documented files.
 
-4.3.3 A brief statement of purpose for the file **should** appear as the first comment after the file. If included, the brief statement, **must** be preceded by the "\\brief" command.
+4.4.3 A brief statement of purpose for the file **should** appear as the first 
+comment after the file command. If included, the brief statement, **must** be 
+preceded by the "\\brief" command.
 
-      Brief documentation statements are often helpful to those scanning the 
-      documentation.
-
-4.3.4 Any detailed notes about the file **may** be included after the brief comment. If this is done, the detailed comments **must** be separated from the brief statement by a blank line.
-
-4.3.4 The name of the original author of the file **may** be entered after the file notes. If the author's name is included, it **must** be preceded by the "\\author" command.
+4.4.4 Any detailed notes about the file **may** be included after the brief 
+comment. If this is done, the detailed comments **must** be separated from 
+the brief statement by a line containing no documentation text.
 
 
 --------------------------------------------------------------------
 4.5 Type documentation
 --------------------------------------------------------------------
 
-4.5.1 Each type definition (i.e., class, struct, enum, typedef, etc.) and macro definition appearing in a header file **must** have a Doxygen type definition comment prologue immediately before it. For example
+4.5.1 Each type and macro definition appearing in a header file **must** have 
+a Doxygen type definition comment prologue immediately before it. For example
 
 .. code-block:: cpp
 
@@ -1118,77 +1135,37 @@ can be found in any of the RAJA files.
     ****************************************************************************
     */
 
-Note that Doxygen requires that a compound entity, such as a class, struct, 
-etc. must be documented in order to document any of its members.
+**Note that Doxygen requires that a compound entity, such as a class, struct, 
+etc. be documented in order to document any of its members.**
 
-4.5.2 A brief statement describing the type **must** appear as the first text comment using the Doxygen command "\\brief".
+4.5.2 A brief statement describing the type **must** appear as the first text 
+comment using the Doxygen command "\\brief".
 
-4.5.3 Important details about the item **should** be included after the brief comment and, if included, **must** be separated from the brief comment by a blank line.
+4.5.3 Important details about the item **should** be included after the brief 
+comment and, if included, **must** be separated from the brief comment by a 
+blank line.
 
-4.5.4 Cross-references to other items, such as relevant major types, important functions, etc., **should** be included at the end of the prologue to enhance the navigability of the Doxygen documentation. 
+4.5.4 Cross-references to other items, such as other related types **should** 
+be included in the prologue to enhance the navigability of the documentation. 
 
       The Doxygen command "\\sa" (for "see also") **should** appear before each
       such cross-reference so that links are generated in the documentation.
 
-4.5.6 Caveats or limitations about the documented type **should** be noted using the "\\warning" Doxygen command as shown above.
+4.5.5 Caveats or limitations about the documented type **should** be noted 
+using the "\\warning" Doxygen command as shown above.
 
 
 --------------------------------------------------------------------
-4.6 Data member documentation
+4.6 Function documentation
 --------------------------------------------------------------------
 
-4.6.1 Each struct field, C++ class data member, etc. **should** have a descriptive comment indicating its purpose. 
+4.6.1 Each unbound function **should** be be documented with a function 
+prologue in the header file where its prototype appears or in a source file 
+immediately preceding its implementation.
 
-     This comment may as appear as a prologue before the item, such as::
-
-        /*!
-         *
-         * \brief Brief statement of purpose of data member m_mode.
-         *
-         * Optional detailed information about m_mode...
-         */
-        int m_mode;
-
-     or, it may appear after the item as an inline comment such as::
-
-        int m_mode; /*!< \brief Brief statement of purpose of m_mode... */
-
-4.6.2 Regardless of which documentation form is used, a brief description of purpose of the definition **must** be included using the Doxygen command "\\brief".
-
-4.6.3 When documenting a data item inline (as in the second example above), the comment must follow the item on the same line.
-
-     The form of an inline Doxygen comment is::
-
-         /*!< \brief ...comment text... */
-
-     Note that the "<" character must be included immediately after the start 
-     of the Doxygen comment form (with no space between). This tells Doxygen 
-     that the comment corresponds to the item immediately preceding it.
-
-4.6.4 Any detailed notes about an item, if included, **must** appear after the brief comment and be separated from the brief comment with a blank line. 
-
-4.6.5 When a detailed comment is provided, or the brief statement requires more than one line, the prologue comment form **should** be used instead of the inline form to make the documentation easier to read.
-
-4.6.6 If the names of data members are sufficiently clear that their meaning and purpose are obvious to other developers (which should be determined in a code review), then the members **may** be grouped together and documented with a single descriptive comment.
-
-      An example of Doxygen syntax for such a grouping is::
-
-         //@{
-         //!  @name Data member description...
-
-         int m_member1;
-         int m_member2;
-         ...
-         //@}
-
-
---------------------------------------------------------------------
-4.7 Function documentation
---------------------------------------------------------------------
-
-4.7.1 Each unbound functions **should** be be documented with a function prologue in the header file where its prototype appears or in a source file immediately preceding its implementation.
-
-4.7.2 Since C++ class member member functions define the class interface, they **should** be documented with a function prologue immediately preceding their declaration in the class definition.
+4.6.2 Since C++ class member functions define the class interface, they 
+**should** be documented with a function prologue immediately preceding 
+their declaration in the class definition.
 
 The following examples show two function prologue variations that may 
 be used to document a method in a class definition. The first shows how
@@ -1199,7 +1176,7 @@ to document the function arguments in the function prologue.
       /*!
        *************************************************************************
        *
-       * \brief Initialize a Foo object to given operation mode.
+       * \brief Initialize a Foo object with given operation mode.
        *
        * The "read" mode means one thing, while "write" mode means another.
        *
@@ -1215,7 +1192,7 @@ to document the function arguments in the function prologue.
        */
        bool initMode(OpMode mode);
 
-The second example shows how to document the function arguments inline.
+The second example shows how to document the function argument inline.
 
 .. code-block:: cpp
 
@@ -1234,20 +1211,25 @@ The second example shows how to document the function arguments inline.
        bool initMode(OpMode mode /*!< [in] ReadMode, WriteMode are valid options */ );
 
 Note that the first example uses the "\\" character to identify Doxygen 
-commands; the second uses "@". Also, the "<" character must appear immediately 
-after the start of the Doxygen comment form (with no space between). This 
-tells Doxygen that the comment corresponds to the item immediately preceding it.
+commands; the second uses "@". 
 
-4.7.3 A brief statement of purpose for a function must appear as the first text comment after the Doxygen command "\\brief" (or "@brief"). 
+4.6.3 A brief statement of purpose for a function must appear as the first 
+text comment after the Doxygen command "\\brief" (or "@brief"). 
 
-4.7.4 Any detailed notes about a function, when included, **must** appear after the brief comment and **must** be separated from the brief comment by a blank line.
+4.6.4 Any detailed function description, when included, **must** appear 
+after the brief comment and **must** be separated from the brief comment by 
+a line containing no text.
 
-4.7.4 If the function has a non-void return type, the return value **should** be documented in the prologue using the Doxygen command "\return" (or "@return") preceding a description of the return value. 
+4.6.4 If the function has a non-void return type, the return value **should** 
+be documented in the prologue using the Doxygen command "\return" 
+(or "@return") preceding a description of the return value. 
 
       Functions with "void" return type and C++ class constructors and 
       destructors **should not** have such documentation.
 
-4.7.5 Function arguments **should** be documented in the function prologue or inline (as shown above) when the intent or usage of the arguments is not obvious. 
+4.6.5 Function arguments **should** be documented in the function prologue 
+or inline (as shown above) when the intent or usage of the arguments is not 
+obvious. 
 
       The inline form of the comment may be preferable when the argument 
       documentation is short. When a longer description is provided (such as 
@@ -1261,12 +1243,14 @@ tells Doxygen that the comment corresponds to the item immediately preceding it.
       when there are one or two arguments and their meaning is obvious from 
       their names or the description of the function, providing no comments is 
       better than cluttering the code by documenting the obvious. Comments 
-      that impart no useful information are distracting and less useful than 
+      that impart no useful information are distracting and less helpful than 
       no comment at all.
 
-4.7.6 When a function argument is documented in the prologue comment section, the Doxygen command "\param" **should** appear before the comment as in the first example above.
+4.6.6 When a function argument is documented in the prologue comment section, 
+the Doxygen command "\param" **should** appear before the comment as in the 
+first example above.
 
-4.7.7. The "in/out" status of each function argument **should** be documented.
+4.6.7. The "in/out" status of each function argument **should** be documented.
 
        The Doxygen "\param" command supports this directly by allowing such an
        attribute to be specified as "\param[in]", "\param[out]", or 
@@ -1274,7 +1258,9 @@ tells Doxygen that the comment corresponds to the item immediately preceding it.
        this, such a description **should** be included; e.g., by using "[in]", 
        "[out]", or "[in,out]" in the comment.
 
-4.7.8 Short, simple functions (e.g., inline methods) **may** be grouped together and documented with a single descriptive comment when this is sufficient.
+4.6.8 Short, simple functions (e.g., inline methods) **may** be grouped 
+together and documented with a single descriptive comment when this is 
+sufficient.
 
       An example of Doxygen syntax for such a grouping is::
 
@@ -1286,7 +1272,9 @@ tells Doxygen that the comment corresponds to the item immediately preceding it.
 
          //@}
 
-4.7.9 Typically, important implementation details about a function **should** be documented in the source file where the function is implemented. 
+4.6.9 Important implementation details (vs. usage detailed) about a function 
+**should** be documented in the source file where the function is implemented,
+rather than the header file where the function is declared.
 
       Header file documentation **should** include only purpose and usage 
       information germane to an interface. When a function has separate 
@@ -1294,10 +1282,9 @@ tells Doxygen that the comment corresponds to the item immediately preceding it.
       syntax. Using Doygen syntax to document an item in more than one location 
       (e.g., header file and source file) can cause undesired Doxygen 
       formatting issues and potentially confusing documentation.
-      
 
       A member of a class may be documented as follows in the source file 
-      for the class as follows::
+      for the class as follows (i.e., no Docygen comments)::
 
         /*
          ***********************************************************************
@@ -1312,6 +1299,53 @@ tells Doxygen that the comment corresponds to the item immediately preceding it.
          {
             ...function body...
          }
+
+
+--------------------------------------------------------------------
+4.7 Data member documentation
+--------------------------------------------------------------------
+
+4.7.1 Each struct field or class data member **should** have a descriptive 
+comment indicating its purpose. 
+
+     This comment may as appear as a prologue before the item, such as::
+
+        /*!
+         * \brief Brief statement describing the input mode...
+         *
+         * Optional detailed information about the input mode...
+         */
+        int m_input_mode;
+
+     or, it may appear after the item as an inline comment such as::
+
+        int m_input_mode; /*!< \brief Brief statement describing the input mode.... */
+
+4.7.2 Regardless of which documentation form is used, a brief description 
+**must** be included using the Doxygen command "\\brief".
+
+4.7.3 Any detailed description of an item, if included, **must** appear after 
+the brief comment and be separated from the brief comment with a line
+containing no documentation text.
+
+4.7.4 When a detailed comment is provided, or the brief statement requires 
+more than one line, the prologue comment form **should** be used instead 
+of the inline form to make the documentation easier to read.
+
+4.7.6 If the names of data members are sufficiently clear that their meaning 
+and purpose are obvious to other developers (which should be determined in 
+a code review), then the members **may** be grouped together and documented 
+with a single descriptive comment.
+
+      An example of Doxygen syntax for such a grouping is::
+
+         //@{
+         //!  @name Data member description...
+
+         int m_member1;
+         int m_member2;
+         ...
+         //@}
 
 
 ===========================
