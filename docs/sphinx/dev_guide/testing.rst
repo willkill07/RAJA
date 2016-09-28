@@ -67,4 +67,5 @@ the RAJA example repo.
 Performance Tests
 ======================================================
 
-The RAJA performance suite is under construction....
+Fill in this section when we have something useful to say about it....
+
