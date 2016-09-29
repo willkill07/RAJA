@@ -176,7 +176,7 @@ using cuda_reduce_atomic_async = cuda_reduce_atomic<BLOCK_SIZE, Impl, true>;
 // values for CUDA warp size and max block size.
 //
 const int WARP_SIZE = 32;
-const int RAJA_CUDA_MAX_BLOCK_SIZE = 2048;
+const int RAJA_CUDA_MAX_BLOCK_SIZE = 1024;
 
 /*!
  * \def RAJA_CUDA_LAUNCH_PARAMS(gridSize, blockSize)

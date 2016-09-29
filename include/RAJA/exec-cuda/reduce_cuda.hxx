@@ -298,7 +298,7 @@ private:
   // Sanity checks for block size and template type size
   static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
   static constexpr bool reasonableRangeCheck =
-      ((BLOCK_SIZE >= 32) && (BLOCK_SIZE <= 1024));
+      ((BLOCK_SIZE >= WARP_SIZE) && (BLOCK_SIZE <= RAJA_CUDA_MAX_BLOCK_SIZE));
   static constexpr bool sizeofcheck =
       ((sizeof(T) <= sizeof(CudaReductionDummyDataType))
        && (sizeof(CudaReductionTallyType<T>)
@@ -307,7 +307,9 @@ private:
            <= sizeof(CudaReductionDummyBlockType)));
   static_assert(powerOfTwoCheck, "Error: block sizes must be a power of 2");
   static_assert(reasonableRangeCheck,
-                "Error: block sizes must be between 32 and 1024");
+                "Error: block sizes must be between " 
+                RAJA_STRINGIFY_MACRO(WARP_SIZE) " and " 
+                RAJA_STRINGIFY_MACRO(RAJA_CUDA_MAX_BLOCK_SIZE));
   static_assert(sizeofcheck,
       "Error: type must be of size <= " 
       RAJA_STRINGIFY_MACRO(RAJA_CUDA_REDUCE_VAR_MAXSIZE));
@@ -502,7 +504,7 @@ private:
   // Sanity checks for block size and template type size
   static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
   static constexpr bool reasonableRangeCheck =
-      ((BLOCK_SIZE >= 32) && (BLOCK_SIZE <= 1024));
+      ((BLOCK_SIZE >= WARP_SIZE) && (BLOCK_SIZE <= RAJA_CUDA_MAX_BLOCK_SIZE));
   static constexpr bool sizeofcheck =
       ((sizeof(T) <= sizeof(CudaReductionDummyDataType))
        && (sizeof(CudaReductionTallyType<T>)
@@ -511,7 +513,9 @@ private:
            <= sizeof(CudaReductionDummyBlockType)));
   static_assert(powerOfTwoCheck, "Error: block sizes must be a power of 2");
   static_assert(reasonableRangeCheck,
-                "Error: block sizes must be between 32 and 1024");
+                "Error: block sizes must be between " 
+                RAJA_STRINGIFY_MACRO(WARP_SIZE) " and " 
+                RAJA_STRINGIFY_MACRO(RAJA_CUDA_MAX_BLOCK_SIZE));
   static_assert(sizeofcheck,
       "Error: type must be of size <= " 
       RAJA_STRINGIFY_MACRO(RAJA_CUDA_REDUCE_VAR_MAXSIZE));
@@ -764,7 +768,7 @@ private:
   // Sanity checks for block size and template type size
   static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
   static constexpr bool reasonableRangeCheck =
-      ((BLOCK_SIZE >= 32) && (BLOCK_SIZE <= 1024));
+      ((BLOCK_SIZE >= WARP_SIZE) && (BLOCK_SIZE <= RAJA_CUDA_MAX_BLOCK_SIZE));
   static constexpr bool sizeofcheck =
       ((sizeof(T) <= sizeof(CudaReductionDummyDataType))
        && (sizeof(CudaReductionTallyType<T>)
@@ -773,7 +777,9 @@ private:
            <= sizeof(CudaReductionDummyBlockType)));
   static_assert(powerOfTwoCheck, "Error: block sizes must be a power of 2");
   static_assert(reasonableRangeCheck,
-                "Error: block sizes must be between 32 and 1024");
+                "Error: block sizes must be between " 
+                RAJA_STRINGIFY_MACRO(WARP_SIZE) " and " 
+                RAJA_STRINGIFY_MACRO(RAJA_CUDA_MAX_BLOCK_SIZE));
   static_assert(sizeofcheck,
       "Error: type must be of size <= " 
       RAJA_STRINGIFY_MACRO(RAJA_CUDA_REDUCE_VAR_MAXSIZE));
@@ -974,7 +980,7 @@ private:
   // Sanity checks for block size and template type size
   static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
   static constexpr bool reasonableRangeCheck =
-      ((BLOCK_SIZE >= 32) && (BLOCK_SIZE <= 1024));
+      ((BLOCK_SIZE >= WARP_SIZE) && (BLOCK_SIZE <= RAJA_CUDA_MAX_BLOCK_SIZE));
   static constexpr bool sizeofcheck =
       ((sizeof(T) <= sizeof(CudaReductionDummyDataType))
        && (sizeof(CudaReductionTallyType<T>)
@@ -983,7 +989,9 @@ private:
            <= sizeof(CudaReductionDummyBlockType)));
   static_assert(powerOfTwoCheck, "Error: block sizes must be a power of 2");
   static_assert(reasonableRangeCheck,
-                "Error: block sizes must be between 32 and 1024");
+                "Error: block sizes must be between " 
+                RAJA_STRINGIFY_MACRO(WARP_SIZE) " and " 
+                RAJA_STRINGIFY_MACRO(RAJA_CUDA_MAX_BLOCK_SIZE));
   static_assert(sizeofcheck,
       "Error: type must be of size <= " 
       RAJA_STRINGIFY_MACRO(RAJA_CUDA_REDUCE_VAR_MAXSIZE));
@@ -1287,7 +1295,7 @@ private:
   // Sanity checks for block size and template type size
   static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
   static constexpr bool reasonableRangeCheck =
-      ((BLOCK_SIZE >= 32) && (BLOCK_SIZE <= 1024));
+      ((BLOCK_SIZE >= WARP_SIZE) && (BLOCK_SIZE <= RAJA_CUDA_MAX_BLOCK_SIZE));
   static constexpr bool sizeofcheck =
       ((sizeof(T) <= sizeof(CudaReductionDummyDataType))
        && (sizeof(CudaReductionLocTallyType<T>)
@@ -1296,7 +1304,9 @@ private:
            <= sizeof(CudaReductionDummyBlockType)));
   static_assert(powerOfTwoCheck, "Error: block sizes must be a power of 2");
   static_assert(reasonableRangeCheck,
-                "Error: block sizes must be between 32 and 1024");
+                "Error: block sizes must be between " 
+                RAJA_STRINGIFY_MACRO(WARP_SIZE) " and " 
+                RAJA_STRINGIFY_MACRO(RAJA_CUDA_MAX_BLOCK_SIZE));
   static_assert(sizeofcheck,
       "Error: type must be of size <= " 
       RAJA_STRINGIFY_MACRO(RAJA_CUDA_REDUCE_VAR_MAXSIZE));
@@ -1601,7 +1611,7 @@ private:
   // Sanity checks for block size and template type size
   static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
   static constexpr bool reasonableRangeCheck =
-      ((BLOCK_SIZE >= 32) && (BLOCK_SIZE <= 1024));
+      ((BLOCK_SIZE >= WARP_SIZE) && (BLOCK_SIZE <= RAJA_CUDA_MAX_BLOCK_SIZE));
   static constexpr bool sizeofcheck =
       ((sizeof(T) <= sizeof(CudaReductionDummyDataType))
        && (sizeof(CudaReductionLocTallyType<T>)
@@ -1610,7 +1620,9 @@ private:
            <= sizeof(CudaReductionDummyBlockType)));
   static_assert(powerOfTwoCheck, "Error: block sizes must be a power of 2");
   static_assert(reasonableRangeCheck,
-                "Error: block sizes must be between 32 and 1024");
+                "Error: block sizes must be between " 
+                RAJA_STRINGIFY_MACRO(WARP_SIZE) " and " 
+                RAJA_STRINGIFY_MACRO(RAJA_CUDA_MAX_BLOCK_SIZE));
   static_assert(sizeofcheck,
       "Error: type must be of size <= " 
       RAJA_STRINGIFY_MACRO(RAJA_CUDA_REDUCE_VAR_MAXSIZE));
@@ -1838,18 +1850,21 @@ private:
   const bool m_is_copy_host = false;
 
   // Sanity checks for block size and template type size
-  static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
+  static constexpr bool multipleOfWarpSizeCheck = (!(BLOCK_SIZE & (WARP_SIZE - 1)));
   static constexpr bool reasonableRangeCheck =
-      ((BLOCK_SIZE >= 32) && (BLOCK_SIZE <= 1024));
+      ((BLOCK_SIZE >= WARP_SIZE) && (BLOCK_SIZE <= RAJA_CUDA_MAX_BLOCK_SIZE));
   static constexpr bool sizeofcheck =
       ((sizeof(T) <= sizeof(CudaReductionDummyDataType))
        && (sizeof(CudaReductionTallyType<T>)
            <= sizeof(CudaReductionDummyTallyType))
        && (sizeof(CudaReductionBlockType<T>)
            <= sizeof(CudaReductionDummyBlockType)));
-  static_assert(powerOfTwoCheck, "Error: block sizes must be a power of 2");
+  static_assert(multipleOfWarpSizeCheck, "Error: block sizes must be a multiple of "
+      RAJA_STRINGIFY_MACRO(WARP_SIZE));
   static_assert(reasonableRangeCheck,
-                "Error: block sizes must be between 32 and 1024");
+                "Error: block sizes must be between " 
+                RAJA_STRINGIFY_MACRO(WARP_SIZE) " and " 
+                RAJA_STRINGIFY_MACRO(RAJA_CUDA_MAX_BLOCK_SIZE));
   static_assert(sizeofcheck,
       "Error: type must be of size <= " 
       RAJA_STRINGIFY_MACRO(RAJA_CUDA_REDUCE_VAR_MAXSIZE));
@@ -2045,18 +2060,21 @@ private:
   const bool m_is_copy_host = false;
 
   // Sanity checks for block size and template type size
-  static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
+  static constexpr bool multipleOfWarpSizeCheck = (!(BLOCK_SIZE & (WARP_SIZE - 1)));
   static constexpr bool reasonableRangeCheck =
-      ((BLOCK_SIZE >= 32) && (BLOCK_SIZE <= 1024));
+      ((BLOCK_SIZE >= WARP_SIZE) && (BLOCK_SIZE <= RAJA_CUDA_MAX_BLOCK_SIZE));
   static constexpr bool sizeofcheck =
       ((sizeof(T) <= sizeof(CudaReductionDummyDataType))
        && (sizeof(CudaReductionTallyType<T>)
            <= sizeof(CudaReductionDummyTallyType))
        && (sizeof(CudaReductionBlockType<T>)
            <= sizeof(CudaReductionDummyBlockType)));
-  static_assert(powerOfTwoCheck, "Error: block sizes must be a power of 2");
+  static_assert(multipleOfWarpSizeCheck, "Error: block sizes must be a multiple of "
+      RAJA_STRINGIFY_MACRO(WARP_SIZE));
   static_assert(reasonableRangeCheck,
-                "Error: block sizes must be between 32 and 1024");
+                "Error: block sizes must be between " 
+                RAJA_STRINGIFY_MACRO(WARP_SIZE) " and " 
+                RAJA_STRINGIFY_MACRO(RAJA_CUDA_MAX_BLOCK_SIZE));
   static_assert(sizeofcheck,
       "Error: type must be of size <= " 
       RAJA_STRINGIFY_MACRO(RAJA_CUDA_REDUCE_VAR_MAXSIZE));
@@ -2316,18 +2334,21 @@ private:
   const bool m_is_copy_host = false;
 
   // Sanity checks for block size and template type size
-  static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
+  static constexpr bool multipleOfWarpSizeCheck = (!(BLOCK_SIZE & (WARP_SIZE - 1)));
   static constexpr bool reasonableRangeCheck =
-      ((BLOCK_SIZE >= 32) && (BLOCK_SIZE <= 1024));
+      ((BLOCK_SIZE >= WARP_SIZE) && (BLOCK_SIZE <= RAJA_CUDA_MAX_BLOCK_SIZE));
   static constexpr bool sizeofcheck =
       ((sizeof(T) <= sizeof(CudaReductionDummyDataType))
        && (sizeof(CudaReductionTallyType<T>)
            <= sizeof(CudaReductionDummyTallyType))
        && (sizeof(CudaReductionBlockType<T>)
            <= sizeof(CudaReductionDummyBlockType)));
-  static_assert(powerOfTwoCheck, "Error: block sizes must be a power of 2");
+  static_assert(multipleOfWarpSizeCheck, "Error: block sizes must be a multiple of "
+      RAJA_STRINGIFY_MACRO(WARP_SIZE));
   static_assert(reasonableRangeCheck,
-                "Error: block sizes must be between 32 and 1024");
+                "Error: block sizes must be between " 
+                RAJA_STRINGIFY_MACRO(WARP_SIZE) " and " 
+                RAJA_STRINGIFY_MACRO(RAJA_CUDA_MAX_BLOCK_SIZE));
   static_assert(sizeofcheck,
       "Error: type must be of size <= " 
       RAJA_STRINGIFY_MACRO(RAJA_CUDA_REDUCE_VAR_MAXSIZE));
@@ -2528,18 +2549,21 @@ private:
   const bool m_is_copy_host = false;
 
   // Sanity checks for block size and template type size
-  static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
+  static constexpr bool multipleOfWarpSizeCheck = (!(BLOCK_SIZE & (WARP_SIZE - 1)));
   static constexpr bool reasonableRangeCheck =
-      ((BLOCK_SIZE >= 32) && (BLOCK_SIZE <= 1024));
+      ((BLOCK_SIZE >= WARP_SIZE) && (BLOCK_SIZE <= RAJA_CUDA_MAX_BLOCK_SIZE));
   static constexpr bool sizeofcheck =
       ((sizeof(T) <= sizeof(CudaReductionDummyDataType))
        && (sizeof(CudaReductionTallyType<T>)
            <= sizeof(CudaReductionDummyTallyType))
        && (sizeof(CudaReductionBlockType<T>)
            <= sizeof(CudaReductionDummyBlockType)));
-  static_assert(powerOfTwoCheck, "Error: block sizes must be a power of 2");
+  static_assert(multipleOfWarpSizeCheck, "Error: block sizes must be a multiple of "
+      RAJA_STRINGIFY_MACRO(WARP_SIZE));
   static_assert(reasonableRangeCheck,
-                "Error: block sizes must be between 32 and 1024");
+                "Error: block sizes must be between " 
+                RAJA_STRINGIFY_MACRO(WARP_SIZE) " and " 
+                RAJA_STRINGIFY_MACRO(RAJA_CUDA_MAX_BLOCK_SIZE));
   static_assert(sizeofcheck,
       "Error: type must be of size <= " 
       RAJA_STRINGIFY_MACRO(RAJA_CUDA_REDUCE_VAR_MAXSIZE));
@@ -2820,18 +2844,21 @@ private:
   const bool m_is_copy_host = false;
 
   // Sanity checks for block size and template type size
-  static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
+  static constexpr bool multipleOfWarpSizeCheck = (!(BLOCK_SIZE & (WARP_SIZE - 1)));
   static constexpr bool reasonableRangeCheck =
-      ((BLOCK_SIZE >= 32) && (BLOCK_SIZE <= 1024));
+      ((BLOCK_SIZE >= WARP_SIZE) && (BLOCK_SIZE <= RAJA_CUDA_MAX_BLOCK_SIZE));
   static constexpr bool sizeofcheck =
       ((sizeof(T) <= sizeof(CudaReductionDummyDataType))
        && (sizeof(CudaReductionLocTallyType<T>)
            <= sizeof(CudaReductionDummyTallyType))
        && (sizeof(CudaReductionLocBlockType<T>)
            <= sizeof(CudaReductionDummyBlockType)));
-  static_assert(powerOfTwoCheck, "Error: block sizes must be a power of 2");
+  static_assert(multipleOfWarpSizeCheck, "Error: block sizes must be a multiple of "
+      RAJA_STRINGIFY_MACRO(WARP_SIZE));
   static_assert(reasonableRangeCheck,
-                "Error: block sizes must be between 32 and 1024");
+                "Error: block sizes must be between " 
+                RAJA_STRINGIFY_MACRO(WARP_SIZE) " and " 
+                RAJA_STRINGIFY_MACRO(RAJA_CUDA_MAX_BLOCK_SIZE));
   static_assert(sizeofcheck,
       "Error: type must be of size <= " 
       RAJA_STRINGIFY_MACRO(RAJA_CUDA_REDUCE_VAR_MAXSIZE));
@@ -3112,18 +3139,21 @@ private:
   const bool m_is_copy_host = false;
 
   // Sanity checks for block size and template type size
-  static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
+  static constexpr bool multipleOfWarpSizeCheck = (!(BLOCK_SIZE & (WARP_SIZE - 1)));
   static constexpr bool reasonableRangeCheck =
-      ((BLOCK_SIZE >= 32) && (BLOCK_SIZE <= 1024));
+      ((BLOCK_SIZE >= WARP_SIZE) && (BLOCK_SIZE <= RAJA_CUDA_MAX_BLOCK_SIZE));
   static constexpr bool sizeofcheck =
       ((sizeof(T) <= sizeof(CudaReductionDummyDataType))
        && (sizeof(CudaReductionLocTallyType<T>)
            <= sizeof(CudaReductionDummyTallyType))
        && (sizeof(CudaReductionLocBlockType<T>)
            <= sizeof(CudaReductionDummyBlockType)));
-  static_assert(powerOfTwoCheck, "Error: block sizes must be a power of 2");
+  static_assert(multipleOfWarpSizeCheck, "Error: block sizes must be a multiple of "
+      RAJA_STRINGIFY_MACRO(WARP_SIZE));
   static_assert(reasonableRangeCheck,
-                "Error: block sizes must be between 32 and 1024");
+                "Error: block sizes must be between " 
+                RAJA_STRINGIFY_MACRO(WARP_SIZE) " and " 
+                RAJA_STRINGIFY_MACRO(RAJA_CUDA_MAX_BLOCK_SIZE));
   static_assert(sizeofcheck,
       "Error: type must be of size <= " 
       RAJA_STRINGIFY_MACRO(RAJA_CUDA_REDUCE_VAR_MAXSIZE));
