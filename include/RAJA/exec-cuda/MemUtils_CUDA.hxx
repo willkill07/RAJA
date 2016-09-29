@@ -354,7 +354,7 @@ void beforeCudaReadTallyBlock(int id)
  *
  ******************************************************************************
  */
-int getCudaSharedmemOffset(int id, dim3 reductionBlockDim, int size);
+int getCudaSharedmemOffset(int id, int num_threads_divisibility_requirement, dim3 reductionBlockDim, int size);
 
 /*!
  ******************************************************************************

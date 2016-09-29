@@ -71,6 +71,10 @@
 
 #include "RAJA/internal/defines.hxx"
 
+#include "RAJA/IndexSet.hxx"
+
+#include "RAJA/exec-sequential/raja_sequential.hxx"
+
 namespace RAJA
 {
 

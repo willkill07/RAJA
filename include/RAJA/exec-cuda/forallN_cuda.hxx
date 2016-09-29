@@ -58,6 +58,8 @@
 //
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
+#include "RAJA/foralln/Generic.hxx"
+
 #include <cassert>
 
 #include "RAJA/int_datatypes.hxx"

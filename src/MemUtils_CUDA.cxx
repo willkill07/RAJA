@@ -55,6 +55,8 @@
 //
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
+#include "RAJA/exec-cuda/raja_cuda.hxx"
+
 #include "RAJA/exec-cuda/MemUtils_CUDA.hxx"
 
 #include "RAJA/int_datatypes.hxx"
@@ -172,13 +174,15 @@ namespace
    * \brief Holds the number of threads expected by each reduction variable.
    * 
    * This is used to check the execution policy against the reduction policies
-   * of participating reduction varaibles. 
+   * of participating reduction variables. 
    *
    * Note: -1 indicates a reduction variable that is not participating in the 
    * current forall and 0 represents a reduction variable whose execution does
    * not depend on the number of threads used by the execution policy.
    */
-  int s_cuda_reduction_num_threads[RAJA_MAX_REDUCE_VARS] = {-1};
+  int s_cuda_reduction_min_num_threads = -1;
+
+  int s_cuda_reduction_max_num_threads_divisibility_requirement = -1;
 }
 /*
 *******************************************************************************
@@ -392,9 +396,8 @@ void beforeCudaKernelLaunch()
   for(int i = 0; i < RAJA_MAX_REDUCE_VARS; ++i) {
     s_shared_memory_offsets[i] = -1;
   }
-  for(int i = 0; i < RAJA_MAX_REDUCE_VARS; ++i) {
-    s_cuda_reduction_num_threads[i] = -1;
-  }
+  s_cuda_reduction_min_num_threads = RAJA_CUDA_MAX_BLOCK_SIZE;
+  s_cuda_reduction_max_num_threads_divisibility_requirement = 1;
 
   s_tally_valid = false;
   writeBackCudaReductionTallyBlock();
@@ -412,6 +415,8 @@ void afterCudaKernelLaunch()
 {
   s_in_raja_forall = false;
   s_shared_memory_amount_total = 0;
+  s_cuda_reduction_min_num_threads = -1;
+  s_cuda_reduction_max_num_threads_divisibility_requirement = -1;
 }
 
 /*
@@ -482,7 +487,7 @@ void freeCudaReductionTallyBlock()
 *
 *******************************************************************************
 */
-int getCudaSharedmemOffset(int id, dim3 reductionBlockDim, int size)
+int getCudaSharedmemOffset(int id, int num_threads_divisibility_requirement, dim3 reductionBlockDim, int size)
 {
   assert(id < RAJA_MAX_REDUCE_VARS);
 
@@ -495,8 +500,13 @@ int getCudaSharedmemOffset(int id, dim3 reductionBlockDim, int size)
       int num_threads = 
           reductionBlockDim.x * reductionBlockDim.y * reductionBlockDim.z;
 
-      // ignore reduction variables that don't use dynamic shared memory
-      s_cuda_reduction_num_threads[id] = (size > 0) ? num_threads : 0;
+      if (size > 0) {
+        // ignore reduction variables that don't use dynamic shared memory
+        s_cuda_reduction_min_num_threads = RAJA_MIN(num_threads, s_cuda_reduction_min_num_threads);
+      }
+
+      s_cuda_reduction_max_num_threads_divisibility_requirement = 
+        RAJA_MAX(num_threads_divisibility_requirement, s_cuda_reduction_max_num_threads_divisibility_requirement);
 
       s_shared_memory_amount_total += num_threads * size;
     }
@@ -526,26 +536,29 @@ int getCudaSharedmemAmount(dim3 launchGridDim, dim3 launchBlockDim)
     std::cerr << "\n Cuda execution error: "
               << "Can't launch " << launch_num_blocks << " blocks, " 
               << "RAJA_CUDA_MAX_NUM_BLOCKS = " << RAJA_CUDA_MAX_NUM_BLOCKS
-              << ", "
-              << "FILE: " << __FILE__ << " line: " << __LINE__ << std::endl;
+              << std::endl;
     exit(1);
   }
 
   int launch_num_threads = 
-      launchBlockDim.x * launchBlockDim.y * launchBlockDim.z;
+    launchBlockDim.x * launchBlockDim.y * launchBlockDim.z;
 
-  for(int i = 0; i < RAJA_MAX_REDUCE_VARS; ++i) {
-    int reducer_num_threads = s_cuda_reduction_num_threads[i];
-
-    if (reducer_num_threads > 0 && launch_num_threads > reducer_num_threads) {
-      std::cerr << "\n Cuda execution, reduction policy mismatch: "
-                << "reduction policy with BLOCK_SIZE " << reducer_num_threads
-                << " can't be used with execution policy with BLOCK_SIZE "
-                << launch_num_threads << ", "
-                << "FILE: " << __FILE__ << " line: " << __LINE__ << std::endl;
-      exit(1);
-    }
+  if (launch_num_threads > s_cuda_reduction_min_num_threads) {
+    std::cerr << "\n Cuda execution, reduction policy mismatch: "
+              << "reduction policy with BLOCK_SIZE " << s_cuda_reduction_min_num_threads
+              << " can't be used with execution policy with BLOCK_SIZE "
+              << launch_num_threads << std::endl;
+    exit(1);
   }
+
+  if (launch_num_threads % s_cuda_reduction_max_num_threads_divisibility_requirement != 0) {
+    std::cerr << "\n Cuda execution, reduction policy mismatch: "
+              << "execution policy with BLOCK_SIZE " << launch_num_threads 
+              << " can't be used with a reduction policy requiring a multiple of "
+              << s_cuda_reduction_max_num_threads_divisibility_requirement << std::endl;
+    exit(1);
+  }
+
   return s_shared_memory_amount_total;
 }
 

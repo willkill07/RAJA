@@ -175,7 +175,7 @@ public:
     __syncthreads();
 #else
     m_is_copy_host = true;
-    m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
+    m_smem_offset = getCudaSharedmemOffset(m_myID, 1, BLOCK_SIZE, sizeof(T));
 #endif
   }
 
@@ -378,7 +378,7 @@ public:
     __syncthreads();
 #else
     m_is_copy_host = true;
-    m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
+    m_smem_offset = getCudaSharedmemOffset(m_myID, 1, BLOCK_SIZE, sizeof(T));
 #endif
   }
 
@@ -584,7 +584,7 @@ public:
     __syncthreads();
 #else
     m_is_copy_host = true;
-    m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
+    m_smem_offset = getCudaSharedmemOffset(m_myID, 1, BLOCK_SIZE, sizeof(T));
 #endif
   }
 
@@ -845,7 +845,7 @@ public:
     __syncthreads();
 #else
     m_is_copy_host = true;
-    m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
+    m_smem_offset = getCudaSharedmemOffset(m_myID, 1, BLOCK_SIZE, sizeof(T));
 #endif
   }
 
@@ -1063,7 +1063,7 @@ public:
 #else
     m_is_copy_host = true;
     m_smem_offset =
-        getCudaSharedmemOffset(m_myID, BLOCK_SIZE, 
+        getCudaSharedmemOffset(m_myID, 1, BLOCK_SIZE, 
                                (sizeof(T) + sizeof(Index_type)));
 #endif
   }
@@ -1376,7 +1376,7 @@ public:
 #else
     m_is_copy_host = true;
     m_smem_offset =
-        getCudaSharedmemOffset(m_myID, BLOCK_SIZE, 
+        getCudaSharedmemOffset(m_myID, 1, BLOCK_SIZE, 
                                (sizeof(T) + sizeof(Index_type)));
 #endif
   }
@@ -1706,7 +1706,9 @@ public:
     m_is_copy_host(true)
 #endif
   {
-
+#if !defined(__CUDA_ARCH__)
+    getCudaSharedmemOffset(m_myID, WARP_SIZE, BLOCK_SIZE, 0);
+#endif
   }
 
   /*!
@@ -1911,7 +1913,9 @@ public:
     m_is_copy_host(true)
 #endif
   {
-
+#if !defined(__CUDA_ARCH__)
+    getCudaSharedmemOffset(m_myID, WARP_SIZE, BLOCK_SIZE, 0);
+#endif
   }
 
   /*!
@@ -2120,7 +2124,9 @@ public:
     m_is_copy_host(true)
 #endif
   {
-
+#if !defined(__CUDA_ARCH__)
+    getCudaSharedmemOffset(m_myID, WARP_SIZE, BLOCK_SIZE, 0);
+#endif
   }
 
   /*!
@@ -2386,7 +2392,9 @@ public:
     m_is_copy_host(true)
 #endif
   {
-
+#if !defined(__CUDA_ARCH__)
+    getCudaSharedmemOffset(m_myID, WARP_SIZE, BLOCK_SIZE, 0);
+#endif
   }
 
   /*!
@@ -2600,7 +2608,9 @@ public:
     m_is_copy_host(true)
 #endif
   {
-
+#if !defined(__CUDA_ARCH__)
+    getCudaSharedmemOffset(m_myID, WARP_SIZE, BLOCK_SIZE, 0);
+#endif
   }
 
   /*!
@@ -2890,7 +2900,9 @@ public:
     m_is_copy_host(true)
 #endif
   {
-
+#if !defined(__CUDA_ARCH__)
+    getCudaSharedmemOffset(m_myID, WARP_SIZE, BLOCK_SIZE, 0);
+#endif
   }
 
   /*!
