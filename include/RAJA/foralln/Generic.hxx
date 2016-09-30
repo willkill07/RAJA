@@ -75,6 +75,24 @@ struct ForallN_PolicyPair : public I {
   explicit constexpr ForallN_PolicyPair(ISET const &i) : ISET(i) {}
 };
 
+template <typename T>
+constexpr bool is_cuda_policy(T&&)
+{
+  return false;
+}
+
+template <typename P0>
+constexpr inline bool has_cuda_loop()
+{
+  return P0::is_cuda_policy;
+}
+
+template <typename P0, typename P1, typename... PLIST>
+constexpr inline bool has_cuda_loop()
+{
+  return P0::is_cuda_policy || has_cuda_loop<P1, PLIST...>();
+}
+
 template <typename... PLIST>
 struct ExecList {
   constexpr const static size_t num_loops = sizeof...(PLIST);
@@ -263,13 +281,13 @@ RAJA_INLINE void forallN_policy(ForallN_Execute_Tag,
  *
  */
 template <typename BODY_in, typename... Idx>
-struct ForallN_IndexTypeConverter {
+struct ForallN_IndexTypeConverter_reference {
   using BODY = typename std::remove_reference<BODY_in>::type;
 
   RAJA_SUPPRESS_HD_WARN
   RAJA_INLINE
   RAJA_HOST_DEVICE
-  constexpr explicit ForallN_IndexTypeConverter(BODY const &b) : body(b) {}
+  constexpr explicit ForallN_IndexTypeConverter_reference(BODY const &b) : body(b) {}
 
   // call 'policy' layer with next policy
   RAJA_SUPPRESS_HD_WARN
@@ -281,11 +299,29 @@ struct ForallN_IndexTypeConverter {
 
 // This fixes massive compile time slowness for clang sans OpenMP
 // using a reference to body breaks offload for CUDA
-#ifdef RAJA_ENABLE_CUDA
-  BODY body;
-#else
   BODY const &body;
-#endif
+};
+///
+template <typename BODY_in, typename... Idx>
+struct ForallN_IndexTypeConverter_copy {
+  using BODY = typename std::remove_reference<BODY_in>::type;
+
+  RAJA_SUPPRESS_HD_WARN
+  RAJA_INLINE
+  RAJA_HOST_DEVICE
+  constexpr explicit ForallN_IndexTypeConverter_copy(BODY const &b) : body(b) {}
+
+  // call 'policy' layer with next policy
+  RAJA_SUPPRESS_HD_WARN
+  template <typename... ARGS>
+  RAJA_INLINE RAJA_HOST_DEVICE void operator()(ARGS... arg) const
+  {
+    body(Idx(arg)...);
+  }
+
+// This fixes massive compile time slowness for clang sans OpenMP
+// using a reference to body breaks offload for CUDA
+  BODY body;
 };
 
 template <typename POLICY,
@@ -304,14 +340,35 @@ RAJA_INLINE void forallN_impl_extract(RAJA::ExecList<ExecPolicies...>,
   typedef typename POLICY::NextPolicy NextPolicy;
   typedef typename POLICY::NextPolicy::PolicyTag NextPolicyTag;
 
-  // Create index type conversion layer
-  typedef ForallN_IndexTypeConverter<BODY, Indices...> IDX_CONV;
+  if (has_cuda_loop<ExecPolicies...>()) {
+#ifdef RAJA_ENABLE_CUDA
+    // this call should be moved into a cuda file
+    // but must be made before loop_body is copied
+    beforeCudaKernelLaunch();
+#endif
 
-  // call policy layer with next policy
-  forallN_policy<NextPolicy, IDX_CONV>(NextPolicyTag(),
-                                       IDX_CONV(body),
-                                       ForallN_PolicyPair<ExecPolicies, Ts>(
-                                           args)...);
+    // Create index type conversion layer
+    typedef ForallN_IndexTypeConverter_copy<BODY, Indices...> IDX_CONV;
+
+    // call policy layer with next policy
+    forallN_policy<NextPolicy, IDX_CONV>(NextPolicyTag(),
+                                         IDX_CONV(body),
+                                         ForallN_PolicyPair<ExecPolicies, Ts>(
+                                             args)...);
+
+#ifdef RAJA_ENABLE_CUDA
+    afterCudaKernelLaunch();
+#endif
+  } else {
+    // Create index type conversion layer
+    typedef ForallN_IndexTypeConverter_reference<BODY, Indices...> IDX_CONV;
+
+    // call policy layer with next policy
+    forallN_policy<NextPolicy, IDX_CONV>(NextPolicyTag(),
+                                         IDX_CONV(body),
+                                         ForallN_PolicyPair<ExecPolicies, Ts>(
+                                             args)...);
+  }
 }
 
 template <typename T, typename T2>
@@ -360,20 +417,10 @@ RAJA_INLINE void fun_unpacker(VarOps::index_sequence<I0s...>,
 template <typename POLICY, typename... Indices, typename... Ts>
 RAJA_INLINE void forallN(Ts &&... args)
 {
-#ifdef RAJA_ENABLE_CUDA
-  // this call should be moved into a cuda file
-  // but must be made before loop_body is copied
-  beforeCudaKernelLaunch();
-#endif
-
   fun_unpacker<POLICY, Indices...>(
       VarOps::index_sequence<sizeof...(args)-1>{},
       VarOps::make_index_sequence<sizeof...(args)-1>{},
       VarOps::forward<Ts>(args)...);
-
-#ifdef RAJA_ENABLE_CUDA
-  afterCudaKernelLaunch();
-#endif
 }
 
 }  // namespace RAJA

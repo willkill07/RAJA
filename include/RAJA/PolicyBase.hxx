@@ -6,7 +6,8 @@
 
 namespace RAJA {
 
-struct PolicyBase { };
+struct PolicyBase {
+};
 
 }
 

@@ -62,6 +62,10 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 
+#include "RAJA/reducers.hxx"
+ 
+#include "RAJA/int_datatypes.hxx"
+
 namespace RAJA
 {
 
@@ -79,7 +83,7 @@ struct Dim3x {
     return dim.x;
   }
 
-  __host__ __device__ inline unsigned int operator()(dim3 const &dim)
+  __host__ __device__ inline unsigned int operator()(dim3 const &dim) const
   {
     return dim.x;
   }
@@ -91,7 +95,7 @@ struct Dim3y {
     return dim.y;
   }
 
-  __host__ __device__ inline unsigned int operator()(dim3 const &dim)
+  __host__ __device__ inline unsigned int operator()(dim3 const &dim) const
   {
     return dim.y;
   }
@@ -103,7 +107,7 @@ struct Dim3z {
     return dim.z;
   }
 
-  __host__ __device__ inline unsigned int operator()(dim3 const &dim)
+  __host__ __device__ inline unsigned int operator()(dim3 const &dim) const
   {
     return dim.z;
   }
@@ -122,6 +126,7 @@ struct Dim3z {
 ///
 
 struct cuda_exec_base {
+  constexpr const static bool is_cuda_policy = true;
 };
 
 template <size_t BLOCK_SIZE, bool Async = false>
@@ -165,12 +170,45 @@ using cuda_reduce_atomic_async = cuda_reduce_atomic<BLOCK_SIZE, true>;
 const int WARP_SIZE = 32;
 const int RAJA_CUDA_MAX_BLOCK_SIZE = 2048;
 
+const int RAJA_CUDA_MAX_BLOCK_SIZE_X = RAJA_CUDA_MAX_BLOCK_SIZE;
+const int RAJA_CUDA_MAX_BLOCK_SIZE_Y = RAJA_CUDA_MAX_BLOCK_SIZE;
+const int RAJA_CUDA_MAX_BLOCK_SIZE_Z = 64;
+
 /*!
  * \def RAJA_CUDA_LAUNCH_PARAMS(gridSize, blockSize)
  * Macro that generates kernel launch parameters.
  */
 #define RAJA_CUDA_LAUNCH_PARAMS(gridSize, blockSize) \
   gridSize, blockSize, getCudaSharedmemAmount(gridSize, blockSize)
+
+
+// HIDDEN namespace to encapsulate helper functions
+namespace HIDDEN
+{
+/*!
+ ******************************************************************************
+ *
+ * \brief calculate global thread index from 3D grid of 3D blocks
+ *
+ ******************************************************************************
+ */
+__device__ __forceinline__ Index_type getGlobalIdx_3D_3D()
+{
+  Index_type blockId =
+      blockIdx.x + blockIdx.y * gridDim.x + gridDim.x * gridDim.y * blockIdx.z;
+  Index_type threadId = blockId * (blockDim.x * blockDim.y * blockDim.z)
+                        + (threadIdx.z * (blockDim.x * blockDim.y))
+                        + (threadIdx.y * blockDim.x) + threadIdx.x;
+  return threadId;
+}
+__device__ __forceinline__ Index_type getGlobalNumThreads_3D_3D()
+{
+  Index_type numThreads = blockDim.x * blockDim.y * blockDim.z * 
+                          gridDim.x * gridDim.y * gridDim.z;
+  return numThreads;
+}
+
+} // end HIDDEN namespace for helper functions
 
 //
 // Three different variants of min/max reductions can be run by choosing

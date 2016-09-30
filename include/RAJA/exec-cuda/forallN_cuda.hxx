@@ -62,6 +62,8 @@
 
 #include "RAJA/int_datatypes.hxx"
 
+#include "RAJA/exec-cuda/raja_cuda.hxx"
+
 #include "RAJA/exec-cuda/MemUtils_CUDA.hxx"
 
 #include <climits>
@@ -114,6 +116,7 @@ struct CudaDim {
 
 template <typename POL>
 struct CudaPolicy {
+  constexpr const static bool is_cuda_policy = true;
 };
 
 template <typename POL, typename IDX>
@@ -127,41 +130,44 @@ struct CudaIndexPair : public POL {
   typedef IDX INDEX;
 };
 
-template <typename VIEWDIM, int threads_per_block>
+template <typename VIEWDIM, int max_threads_per_block>
 struct CudaThreadBlock {
-  int begin;
-  int end;
+  const int m_begin;
+  const int m_end;
 
   VIEWDIM view;
 
   CudaThreadBlock(CudaDim &dims, RangeSegment const &is)
-      : begin(is.getBegin()), end(is.getEnd())
+      : m_begin(is.getBegin()), m_end(is.getEnd())
   {
     setDims(dims);
   }
 
-  __device__ inline int operator()(void)
+  __device__ inline int begin(void) const
   {
-    int idx = begin + view(blockIdx) * threads_per_block + view(threadIdx);
-    if (idx >= end) {
-      idx = INT_MIN;
-    }
-    return idx;
+    return m_begin + view(blockIdx) * max_threads_per_block + view(threadIdx);
+  }
+
+  __device__ inline int end(void) const
+  {
+    return m_end;
+  }
+
+  __device__ inline int stride(void) const
+  {
+    return view(gridDim) * max_threads_per_block;
   }
 
   void inline setDims(CudaDim &dims)
   {
-    int n = end - begin;
-    if (n < threads_per_block) {
+    int n = m_end - m_begin;
+    if (n < max_threads_per_block) {
       view(dims.num_threads) = n;
       view(dims.num_blocks) = 1;
     } else {
-      view(dims.num_threads) = threads_per_block;
+      view(dims.num_threads) = max_threads_per_block;
 
-      int blocks = n / threads_per_block;
-      if (n % threads_per_block) {
-        ++blocks;
-      }
+      int blocks = RAJA_DIVIDE_CEILING_INT(n, max_threads_per_block);
       view(dims.num_blocks) = blocks;
     }
   }
@@ -169,7 +175,7 @@ struct CudaThreadBlock {
 
 /*
  * These execution policies map a loop nest to the block and threads of a
- * given dimension with the number of THREADS per block specifies.
+ * given dimension with the number of THREADS per block specified.
  */
 
 template <int THREADS>
@@ -181,69 +187,89 @@ using cuda_threadblock_y_exec = CudaPolicy<CudaThreadBlock<Dim3y, THREADS>>;
 template <int THREADS>
 using cuda_threadblock_z_exec = CudaPolicy<CudaThreadBlock<Dim3z, THREADS>>;
 
-template <typename VIEWDIM>
+template <typename VIEWDIM, int max_threads_per_block = RAJA_CUDA_MAX_BLOCK_SIZE >
 struct CudaThread {
-  int begin;
-  int end;
+  const int m_begin;
+  const int m_end;
 
   VIEWDIM view;
 
   CudaThread(CudaDim &dims, RangeSegment const &is)
-      : begin(is.getBegin()), end(is.getEnd())
+      : m_begin(is.getBegin()), m_end(is.getEnd())
   {
     setDims(dims);
   }
 
-  __device__ inline int operator()(void)
+  __device__ inline int begin(void) const
   {
-    int idx = begin + view(threadIdx);
-    if (idx >= end) {
-      idx = INT_MIN;
-    }
-    return idx;
+    return m_begin + view(threadIdx);
+  }
+
+  __device__ inline int end(void) const
+  {
+    return m_end;
+  }
+
+  __device__ inline int stride(void) const
+  {
+    return max_threads_per_block;
   }
 
   void inline setDims(CudaDim &dims)
   {
-    int n = end - begin;
-    view(dims.num_threads) = n;
+    int n = m_end - m_begin;
+    if (n < max_threads_per_block) {
+      view(dims.num_threads) = n;
+    } else {
+      view(dims.num_threads) = max_threads_per_block;
+    }
   }
 };
 
 /* These execution policies map the given loop nest to the threads in the
-   specified dimensions (not blocks)
+   specified dimensions (not blocks), looping when reaching MAX_THREADS
+   Must be copy constructed on the device
  */
-using cuda_thread_x_exec = CudaPolicy<CudaThread<Dim3x>>;
+template < int MAX_THREADS = RAJA_CUDA_MAX_BLOCK_SIZE_X >
+using cuda_thread_x_exec = CudaPolicy<CudaThread<Dim3x, MAX_THREADS>>;
 
-using cuda_thread_y_exec = CudaPolicy<CudaThread<Dim3y>>;
+template < int MAX_THREADS = RAJA_CUDA_MAX_BLOCK_SIZE_Y >
+using cuda_thread_y_exec = CudaPolicy<CudaThread<Dim3y, MAX_THREADS>>;
 
-using cuda_thread_z_exec = CudaPolicy<CudaThread<Dim3z>>;
+template < int MAX_THREADS = RAJA_CUDA_MAX_BLOCK_SIZE_Z >
+using cuda_thread_z_exec = CudaPolicy<CudaThread<Dim3z, MAX_THREADS>>;
 
 template <typename VIEWDIM>
 struct CudaBlock {
-  int begin;
-  int end;
+  const int m_begin;
+  const int m_end;
 
   VIEWDIM view;
 
   CudaBlock(CudaDim &dims, RangeSegment const &is)
-      : begin(is.getBegin()), end(is.getEnd())
+      : m_begin(is.getBegin()), m_end(is.getEnd())
   {
     setDims(dims);
   }
 
-  __device__ inline int operator()(void)
+  __device__ inline int begin(void) const
   {
-    int idx = begin + view(blockIdx);
-    if (idx >= end) {
-      idx = INT_MIN;
-    }
-    return idx;
+    return m_begin + view(blockIdx);
+  }
+
+  __device__ inline int end(void) const
+  {
+    return m_end;
+  }
+
+  __device__ inline int stride(void) const
+  {
+    return view(gridDim);
   }
 
   void inline setDims(CudaDim &dims)
   {
-    int n = end - begin;
+    int n = m_end - m_begin;
     view(dims.num_blocks) = n;
   }
 };
@@ -261,19 +287,19 @@ using cuda_block_z_exec = CudaPolicy<CudaBlock<Dim3z>>;
  * \brief  Function to check indices for out-of-bounds
  *
  */
-template <typename BODY, typename... ARGS>
-RAJA_INLINE __device__ void cudaCheckBounds(BODY &body, int i, ARGS... args)
+template <typename BODY, typename ARG, typename... ARGS>
+RAJA_INLINE __device__ void cudaCheckBounds(BODY &body, ARG& arg, ARGS&... args)
 {
-  if (i > INT_MIN) {
+  for (int i = arg.begin(); i < arg.end(); i += arg.stride()) {
     ForallN_BindFirstArg_Device<BODY> bound(body, i);
     cudaCheckBounds(bound, args...);
   }
 }
-
-template <typename BODY>
-RAJA_INLINE __device__ void cudaCheckBounds(BODY &body, int i)
+///
+template <typename BODY, typename ARG>
+RAJA_INLINE __device__ void cudaCheckBounds(BODY &body, ARG& arg)
 {
-  if (i > INT_MIN) {
+  for (int i = arg.begin(); i < arg.end(); i += arg.stride()) {
     body(i);
   }
 }
@@ -287,9 +313,9 @@ __global__ void cudaLauncherN(BODY loop_body, CARGS... cargs)
 {
   // force reduction object copy constructors and destructors to run
   auto body = loop_body;
-
+  
   // Compute indices and then pass through the bounds-checking mechanism
-  cudaCheckBounds(body, (cargs())...);
+  cudaCheckBounds(body, cargs...);
 }
 
 /*
@@ -357,6 +383,7 @@ struct ForallN_Executor<ForallN_PolicyPair<CudaPolicy<CuARG0>, ISET0>,
                                 BODY body,
                                 CARGS const &... cargs) const
   {
+
     cudaLauncherN<<<RAJA_CUDA_LAUNCH_PARAMS(dims.num_blocks, dims.num_threads)
                  >>>(body, cargs...);
                  

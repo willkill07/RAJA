@@ -117,18 +117,18 @@ void runLTimesTest(std::string const &policy,
   cudaErrchk(cudaMalloc(&d_psi, sizeof(double) * psi_data.size()));
 
   // Copy to device
-  cudaMemcpy(d_ell,
+  cudaErrchk(cudaMemcpy(d_ell,
              &ell_data[0],
              sizeof(double) * ell_data.size(),
-             cudaMemcpyHostToDevice);
-  cudaMemcpy(d_phi,
+             cudaMemcpyHostToDevice));
+  cudaErrchk(cudaMemcpy(d_phi,
              &phi_data[0],
              sizeof(double) * phi_data.size(),
-             cudaMemcpyHostToDevice);
-  cudaMemcpy(d_psi,
+             cudaMemcpyHostToDevice));
+  cudaErrchk(cudaMemcpy(d_psi,
              &psi_data[0],
              sizeof(double) * psi_data.size(),
-             cudaMemcpyHostToDevice);
+             cudaMemcpyHostToDevice));
 
   // create views on data
   typename POL::ELL_VIEW ell(d_ell, num_moments, num_directions);
@@ -158,17 +158,17 @@ void runLTimesTest(std::string const &policy,
         pdmaxloc.maxloc(val, index);
       });
 
-  cudaDeviceSynchronize();
+  cudaErrchk(cudaDeviceSynchronize());
   // Copy to host the result
-  cudaMemcpy(&phi_data[0],
+  cudaErrchk(cudaMemcpy(&phi_data[0],
              d_phi,
              sizeof(double) * phi_data.size(),
-             cudaMemcpyDeviceToHost);
+             cudaMemcpyDeviceToHost));
 
   // Free CUDA memory
-  cudaFree(d_ell);
-  cudaFree(d_phi);
-  cudaFree(d_psi);
+  cudaErrchk(cudaFree(d_ell));
+  cudaErrchk(cudaFree(d_phi));
+  cudaErrchk(cudaFree(d_psi));
 
   ////
   //// CHECK ANSWER against the hand-written sequential kernel
@@ -270,7 +270,7 @@ struct PolLTimesB_GPU {
   // Loops: Moments, Directions, Groups, Zones
   typedef NestedPolicy<ExecList<seq_exec,
                                 seq_exec,
-                                cuda_thread_z_exec,
+                                cuda_thread_z_exec<>,
                                 cuda_block_y_exec>,
                        Permute<PERM_JILK>>
       EXEC;
@@ -334,7 +334,7 @@ void runNegativeRange()
   double *data;
   double host_data[100];
 
-  cudaMallocManaged((void **)&data, sizeof(double) * 100, cudaMemAttachGlobal);
+  cudaErrchk(cudaMallocManaged((void **)&data, sizeof(double) * 100, cudaMemAttachGlobal));
 
   for (int i = 0; i < 100; ++i) {
     host_data[i] = i * 1.0;
@@ -347,7 +347,7 @@ void runNegativeRange()
         data[idx] = idx * 1.0;
       });
 
-  cudaDeviceSynchronize();
+  cudaErrchk(cudaDeviceSynchronize());
 
   size_t nfailed = 0;
 

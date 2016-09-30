@@ -74,6 +74,7 @@ namespace RAJA
 /// Segment execution policies
 ///
 struct cilk_for_exec {
+  constexpr const static bool is_cuda_policy = false;
 };
 
 ///

@@ -65,6 +65,8 @@
 
 #include "RAJA/fault_tolerance.hxx"
 
+#include "RAJA/exec-cuda/raja_cuda.hxx"
+
 #include "RAJA/exec-cuda/raja_cudaerrchk.hxx"
 
 #include "RAJA/exec-cuda/MemUtils_CUDA.hxx"
@@ -81,35 +83,6 @@ namespace RAJA
 //
 //////////////////////////////////////////////////////////////////////
 //
-
-// HIDDEN namespace to encapsulate helper functions
-namespace HIDDEN
-{
-/*!
- ******************************************************************************
- *
- * \brief calculate global thread index from 3D grid of 3D blocks
- *
- ******************************************************************************
- */
-__device__ __forceinline__ Index_type getGlobalIdx_3D_3D()
-{
-  Index_type blockId =
-      blockIdx.x + blockIdx.y * gridDim.x + gridDim.x * gridDim.y * blockIdx.z;
-  Index_type threadId = blockId * (blockDim.x * blockDim.y * blockDim.z)
-                        + (threadIdx.z * (blockDim.x * blockDim.y))
-                        + (threadIdx.y * blockDim.x) + threadIdx.x;
-  return threadId;
-}
-__device__ __forceinline__ Index_type getGlobalNumThreads_3D_3D()
-{
-  Index_type numThreads = blockDim.x * blockDim.y * blockDim.z * 
-                          gridDim.x * gridDim.y * gridDim.z;
-  return numThreads;
-}
-
-} // end HIDDEN namespace for helper functions
-
 
 /*!
  ******************************************************************************
