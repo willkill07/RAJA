@@ -241,9 +241,9 @@ void releaseCudaReductionId(int id)
 void getCudaReductionMemBlock(int id, void** device_memblock)
 {
   if (s_cuda_reduction_mem_block == 0) {
-    cudaErrchk(cudaMalloc((void**)&s_cuda_reduction_mem_block,
+    raja_cudaMalloc((void**)&s_cuda_reduction_mem_block,
                           sizeof(CudaReductionDummyBlockType) *
-                            RAJA_MAX_REDUCE_VARS));
+                            RAJA_MAX_REDUCE_VARS);
 
     atexit(freeCudaReductionMemBlock);
   }
@@ -261,7 +261,7 @@ void getCudaReductionMemBlock(int id, void** device_memblock)
 void freeCudaReductionMemBlock()
 {
   if (s_cuda_reduction_mem_block != 0) {
-    cudaErrchk(cudaFree(s_cuda_reduction_mem_block));
+    raja_cudaFree(s_cuda_reduction_mem_block);
     s_cuda_reduction_mem_block = 0;
   }
 }
@@ -283,9 +283,9 @@ void getCudaReductionTallyBlock(int id, void** host_tally, void** device_tally)
     s_cuda_reduction_tally_block_host = 
         new CudaReductionDummyTallyType[RAJA_CUDA_REDUCE_TALLY_LENGTH];
 
-    cudaErrchk(cudaMalloc((void**)&s_cuda_reduction_tally_block_device,
+    raja_cudaMalloc((void**)&s_cuda_reduction_tally_block_device,
                           sizeof(CudaReductionDummyTallyType) *
-                            RAJA_CUDA_REDUCE_TALLY_LENGTH));
+                            RAJA_CUDA_REDUCE_TALLY_LENGTH);
 
     s_tally_valid = true;
     s_tally_dirty = 0;
@@ -324,10 +324,10 @@ static void writeBackCudaReductionTallyBlock()
           end++;
         }
         int len = (end - first);
-        cudaErrchk(cudaMemcpyAsync(&s_cuda_reduction_tally_block_device[first],
+        raja_cudaMemcpyAsync(&s_cuda_reduction_tally_block_device[first],
                                    &s_cuda_reduction_tally_block_host[first],
                                    sizeof(CudaReductionDummyTallyType) * len,
-                                   cudaMemcpyHostToDevice));
+                                   cudaMemcpyHostToDevice);
         
         for (int i = first; i < end; ++i) {
           s_tally_block_dirty[i] = false;
@@ -355,22 +355,22 @@ static void writeBackCudaReductionTallyBlock()
 static void readCudaReductionTallyBlockAsync()
 {
   if (!s_tally_valid) {
-    cudaErrchk(cudaMemcpyAsync( &s_cuda_reduction_tally_block_host[0],
+    raja_cudaMemcpyAsync( &s_cuda_reduction_tally_block_host[0],
                                 &s_cuda_reduction_tally_block_device[0],
                                 sizeof(CudaReductionDummyTallyType) *
                                   RAJA_CUDA_REDUCE_TALLY_LENGTH,
-                                cudaMemcpyDeviceToHost));
+                                cudaMemcpyDeviceToHost);
     s_tally_valid = true;
   }
 }
 static void readCudaReductionTallyBlock()
 {
   if (!s_tally_valid) {
-    cudaErrchk(cudaMemcpy(  &s_cuda_reduction_tally_block_host[0],
+    raja_cudaMemcpy(  &s_cuda_reduction_tally_block_host[0],
                             &s_cuda_reduction_tally_block_device[0],
                             sizeof(CudaReductionDummyTallyType) *
                               RAJA_CUDA_REDUCE_TALLY_LENGTH,
-                            cudaMemcpyDeviceToHost));
+                            cudaMemcpyDeviceToHost);
     s_tally_valid = true;
   }
 }
@@ -469,7 +469,7 @@ void freeCudaReductionTallyBlock()
 {
   if (s_cuda_reduction_tally_block_host != 0) {
     delete[] s_cuda_reduction_tally_block_host;
-    cudaErrchk(cudaFree(s_cuda_reduction_tally_block_device));
+    raja_cudaFree(s_cuda_reduction_tally_block_device);
     s_cuda_reduction_tally_block_host = 0;
   }
 }

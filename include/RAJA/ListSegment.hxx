@@ -237,11 +237,11 @@ ListSegment::ListSegment(const T& indx)
 {
   if (!indx.empty()) {
 #if defined(RAJA_ENABLE_CUDA)
-    cudaErrchk(cudaMallocManaged((void**)&m_indx,
+    raja_cudaMallocManaged((void**)&m_indx,
                                  m_len * sizeof(Index_type),
-                                 cudaMemAttachGlobal));
-    cudaErrchk(cudaMemset(m_indx, 0, m_len * sizeof(Index_type)));
-    cudaErrchk(cudaDeviceSynchronize());
+                                 cudaMemAttachGlobal);
+    raja_cudaMemset(m_indx, 0, m_len * sizeof(Index_type));
+    raja_cudaDeviceSynchronize();
 #else
     m_indx = new Index_type[indx.size()];
 #endif

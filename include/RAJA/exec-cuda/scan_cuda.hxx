@@ -65,6 +65,8 @@
 #include <thrust/functional.h>
 #include <thrust/scan.h>
 
+#include "raja_cudaerrchk.hxx"
+
 namespace RAJA
 {
 namespace detail
@@ -84,7 +86,7 @@ void inclusive_inplace(const ::RAJA::cuda_exec_base&,
                        T init)
 {
   ::thrust::inclusive_scan(::thrust::device, begin, end, begin, binary_op);
-  cudaDeviceSynchronize();
+  raja_cudaDeviceSynchronize();
 }
 
 /*!
@@ -100,7 +102,7 @@ void exclusive_inplace(const ::RAJA::cuda_exec_base&,
 {
   ::thrust::exclusive_scan(
       ::thrust::device, begin, end, begin, init, binary_op);
-  cudaDeviceSynchronize();
+  raja_cudaDeviceSynchronize();
 }
 
 /*!
@@ -119,7 +121,7 @@ void inclusive(const ::RAJA::cuda_exec_base&,
                T init)
 {
   ::thrust::inclusive_scan(::thrust::device, begin, end, out, binary_op);
-  cudaDeviceSynchronize();
+  raja_cudaDeviceSynchronize();
 }
 
 /*!
@@ -138,7 +140,7 @@ void exclusive(const ::RAJA::cuda_exec_base&,
                T init)
 {
   ::thrust::exclusive_scan(::thrust::device, begin, end, out, init, binary_op);
-  cudaDeviceSynchronize();
+  raja_cudaDeviceSynchronize();
 }
 
 }  // closing brace for scan namespace

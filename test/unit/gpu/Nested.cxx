@@ -112,9 +112,9 @@ void runLTimesTest(std::string const &policy,
   //psi_data[0] = 5.0;
   // create device memory
   double *d_ell, *d_phi, *d_psi;
-  cudaErrchk(cudaMalloc(&d_ell, sizeof(double) * ell_data.size()));
-  cudaErrchk(cudaMalloc(&d_phi, sizeof(double) * phi_data.size()));
-  cudaErrchk(cudaMalloc(&d_psi, sizeof(double) * psi_data.size()));
+  cudaMalloc(&d_ell, sizeof(double) * ell_data.size());
+  cudaMalloc(&d_phi, sizeof(double) * phi_data.size());
+  cudaMalloc(&d_psi, sizeof(double) * psi_data.size());
 
   // Copy to device
   cudaMemcpy(d_ell,
