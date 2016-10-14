@@ -154,7 +154,7 @@ namespace
    * \brief State of the host code, whether it is currently in a raja
    *        forall function or not.
    */
-  bool s_in_raja_forall = false;
+  bool s_raja_forall_level = 0;
   /*!
    * \brief The amount of shared memory currently earmarked for use in
    *        the current forall.
@@ -179,6 +179,8 @@ namespace
    * not depend on the number of threads used by the execution policy.
    */
   int s_cuda_reduction_num_threads[RAJA_MAX_REDUCE_VARS] = {-1};
+
+  int s_cuda_reduction_max_seen_blocks[RAJA_MAX_REDUCE_VARS] = {-1};
 }
 /*
 *******************************************************************************
@@ -387,17 +389,21 @@ static void readCudaReductionTallyBlock()
 */
 void beforeCudaKernelLaunch()
 {
-  s_in_raja_forall = true;
-  s_shared_memory_amount_total = 0;
-  for(int i = 0; i < RAJA_MAX_REDUCE_VARS; ++i) {
-    s_shared_memory_offsets[i] = -1;
-  }
-  for(int i = 0; i < RAJA_MAX_REDUCE_VARS; ++i) {
-    s_cuda_reduction_num_threads[i] = -1;
-  }
+  if (s_raja_forall_level++ == 0) {
+    s_shared_memory_amount_total = 0;
+    for(int i = 0; i < RAJA_MAX_REDUCE_VARS; ++i) {
+      s_shared_memory_offsets[i] = -1;
+    }
+    for(int i = 0; i < RAJA_MAX_REDUCE_VARS; ++i) {
+      s_cuda_reduction_num_threads[i] = -1;
+    }
+    for(int i = 0; i < RAJA_MAX_REDUCE_VARS; ++i) {
+      s_cuda_reduction_max_seen_blocks[i] = 0;
+    }
 
-  s_tally_valid = false;
-  writeBackCudaReductionTallyBlock();
+    s_tally_valid = false;
+    writeBackCudaReductionTallyBlock();
+  }
 }
 
 /*
@@ -410,8 +416,8 @@ void beforeCudaKernelLaunch()
 */
 void afterCudaKernelLaunch()
 {
-  s_in_raja_forall = false;
-  s_shared_memory_amount_total = 0;
+  s_raja_forall_level--;
+  assert(s_raja_forall_level >= 0);
 }
 
 /*
@@ -484,9 +490,9 @@ void freeCudaReductionTallyBlock()
 */
 int getCudaSharedmemOffset(int id, dim3 reductionBlockDim, int size)
 {
-  assert(id < RAJA_MAX_REDUCE_VARS);
+  assert(id < RAJA_MAX_REDUCE_VARS && id >= 0);
 
-  if (s_in_raja_forall) {
+  if (s_raja_forall_level > 0) {
     if (s_shared_memory_offsets[id] < 0) {
       // in a forall and have not yet gotten shared memory
 
@@ -529,6 +535,13 @@ int getCudaSharedmemAmount(dim3 launchGridDim, dim3 launchBlockDim)
               << ", "
               << "FILE: " << __FILE__ << " line: " << __LINE__ << std::endl;
     exit(1);
+  }
+
+  for (int i = 0; i < RAJA_MAX_REDUCE_VARS; i++) {
+    if (s_shared_memory_offsets[i] >= 0 && 
+        launch_num_blocks > s_cuda_reduction_max_seen_blocks[i]) {
+      s_cuda_reduction_max_seen_blocks[i] = launch_num_blocks;
+    }
   }
 
   int launch_num_threads = 

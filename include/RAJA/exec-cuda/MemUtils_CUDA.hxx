@@ -129,8 +129,9 @@ struct RAJA_ALIGNED_ATTR(DATA_ALIGN) CudaReductionDummyBlockType {
  ******************************************************************************
  */
 struct CudaReductionDummyTallyType {
-  CudaReductionDummyDataType dummy_val;
+  CudaReductionDummyDataType dummy_tally;
   GridSizeType dummy_retiredBlocks;
+  GridSizeType dummy_maxSeenBlocks;
 };
 
 /*!
@@ -197,6 +198,7 @@ template <typename T>
 struct CudaReductionTallyType {
   T tally;
   GridSizeType retiredBlocks;
+  GridSizeType maxSeenBlocks;
 };
 
 /*!
@@ -231,6 +233,7 @@ template <typename T>
 struct CudaReductionLocTallyType {
   CudaReductionLocType<T> tally;
   GridSizeType retiredBlocks;
+  GridSizeType maxSeenBlocks;
 };
 
 
