@@ -72,11 +72,36 @@ namespace RAJA
 
 namespace
 {
+  //
+  /////////////////////////////////////////////////////////////////////////////
+  //
+  // Variables representing the state of reduction variable usage.
+  //
+  /////////////////////////////////////////////////////////////////////////////
+  //
+
   /*!
-   * \brief Static array used to keep track of which unique ids
-   * for CUDA reduction objects are used and which are not.
+   * \brief Holds the number of threads expected by each reduction variable.
+   * 
+   * This is used to check which reduction variables are being used and allows 
+   * checking the execution policies against the reduction policies
+   * of participating reduction varaibles.
+   *
+   * Note: 0 indicates a reduction variable that is not being used and negative 
+   * values indicate a reduction variable not participating in the current 
+   * forall.
    */
-  bool s_cuda_reduction_id_used[RAJA_MAX_REDUCE_VARS];
+  int s_cuda_reduction_num_threads[RAJA_MAX_REDUCE_VARS] = {0};
+
+  /*!
+   * \brief Holds the maximum number of blocks each reduction variable has been
+   *        launched with since this number was reset.
+   * 
+   * This is used to check which reduction variables are being used and allows 
+   * checking the execution policies against the reduction policies
+   * of participating reduction varaibles.
+   */
+  int s_cuda_reduction_max_seen_blocks[RAJA_MAX_REDUCE_VARS] = {0};
 
   /*!
    * \brief Pointer to device memory block for RAJA-Cuda reductions.
@@ -154,7 +179,7 @@ namespace
    * \brief State of the host code, whether it is currently in a raja
    *        forall function or not.
    */
-  bool s_raja_forall_level = 0;
+  int s_raja_forall_level = 0;
   /*!
    * \brief The amount of shared memory currently earmarked for use in
    *        the current forall.
@@ -168,19 +193,6 @@ namespace
    * the current forall.
    */
   int s_shared_memory_offsets[RAJA_MAX_REDUCE_VARS] = {-1};
-  /*!
-   * \brief Holds the number of threads expected by each reduction variable.
-   * 
-   * This is used to check the execution policy against the reduction policies
-   * of participating reduction varaibles. 
-   *
-   * Note: -1 indicates a reduction variable that is not participating in the 
-   * current forall and 0 represents a reduction variable whose execution does
-   * not depend on the number of threads used by the execution policy.
-   */
-  int s_cuda_reduction_num_threads[RAJA_MAX_REDUCE_VARS] = {-1};
-
-  int s_cuda_reduction_max_seen_blocks[RAJA_MAX_REDUCE_VARS] = {-1};
 }
 /*
 *******************************************************************************
@@ -190,20 +202,20 @@ namespace
 *
 *******************************************************************************
 */
-int getCudaReductionId()
+int getCudaReductionId(int numThreads)
 {
   static int first_time_called = true;
 
   if (first_time_called) {
     for (int id = 0; id < RAJA_MAX_REDUCE_VARS; ++id) {
-      s_cuda_reduction_id_used[id] = false;
+      s_cuda_reduction_num_threads[id] = 0;
     }
 
     first_time_called = false;
   }
 
   int id = 0;
-  while (id < RAJA_MAX_REDUCE_VARS && s_cuda_reduction_id_used[id]) {
+  while (id < RAJA_MAX_REDUCE_VARS && s_cuda_reduction_num_threads[id] != 0) {
     id++;
   }
 
@@ -213,7 +225,7 @@ int getCudaReductionId()
     exit(1);
   }
 
-  s_cuda_reduction_id_used[id] = true;
+  s_cuda_reduction_num_threads[id] = -numThreads;
 
   return id;
 }
@@ -228,7 +240,7 @@ int getCudaReductionId()
 void releaseCudaReductionId(int id)
 {
   if (id < RAJA_MAX_REDUCE_VARS) {
-    s_cuda_reduction_id_used[id] = false;
+    s_cuda_reduction_num_threads[id] = 0;
   }
 }
 
@@ -390,15 +402,14 @@ static void readCudaReductionTallyBlock()
 void beforeCudaKernelLaunch()
 {
   if (s_raja_forall_level++ == 0) {
+    for(int i = 0; i < RAJA_MAX_REDUCE_VARS; ++i) {
+      if (s_cuda_reduction_num_threads[i] > 0) {
+        s_cuda_reduction_num_threads[i] = -s_cuda_reduction_num_threads[i];
+      }
+    }
     s_shared_memory_amount_total = 0;
     for(int i = 0; i < RAJA_MAX_REDUCE_VARS; ++i) {
       s_shared_memory_offsets[i] = -1;
-    }
-    for(int i = 0; i < RAJA_MAX_REDUCE_VARS; ++i) {
-      s_cuda_reduction_num_threads[i] = -1;
-    }
-    for(int i = 0; i < RAJA_MAX_REDUCE_VARS; ++i) {
-      s_cuda_reduction_max_seen_blocks[i] = 0;
     }
 
     s_tally_valid = false;
@@ -488,7 +499,7 @@ void freeCudaReductionTallyBlock()
 *
 *******************************************************************************
 */
-int getCudaSharedmemOffset(int id, dim3 reductionBlockDim, int size)
+int getCudaSharedmemOffset(int id, int size)
 {
   assert(id < RAJA_MAX_REDUCE_VARS && id >= 0);
 
@@ -499,10 +510,9 @@ int getCudaSharedmemOffset(int id, dim3 reductionBlockDim, int size)
       s_shared_memory_offsets[id] = s_shared_memory_amount_total;
 
       int num_threads = 
-          reductionBlockDim.x * reductionBlockDim.y * reductionBlockDim.z;
+          s_cuda_reduction_num_threads[id] = -s_cuda_reduction_num_threads[id];
 
-      // ignore reduction variables that don't use dynamic shared memory
-      s_cuda_reduction_num_threads[id] = (size > 0) ? num_threads : 0;
+      assert(num_threads > 0);
 
       s_shared_memory_amount_total += num_threads * size;
     }
@@ -523,10 +533,9 @@ int getCudaSharedmemOffset(int id, dim3 reductionBlockDim, int size)
 *
 *******************************************************************************
 */
-int getCudaSharedmemAmount(dim3 launchGridDim, dim3 launchBlockDim)
+int getCudaSharedmemAmount(dim3 gridDim, dim3 blockDim)
 {
-  int launch_num_blocks = 
-      launchGridDim.x * launchGridDim.y * launchGridDim.z;
+  int launch_num_blocks = gridDim.x * gridDim.y * gridDim.z;
 
   if (launch_num_blocks > RAJA_CUDA_MAX_NUM_BLOCKS) {
     std::cerr << "\n Cuda execution error: "
@@ -544,8 +553,7 @@ int getCudaSharedmemAmount(dim3 launchGridDim, dim3 launchBlockDim)
     }
   }
 
-  int launch_num_threads = 
-      launchBlockDim.x * launchBlockDim.y * launchBlockDim.z;
+  int launch_num_threads = blockDim.x * blockDim.y * blockDim.z;
 
   for(int i = 0; i < RAJA_MAX_REDUCE_VARS; ++i) {
     int reducer_num_threads = s_cuda_reduction_num_threads[i];
@@ -560,6 +568,18 @@ int getCudaSharedmemAmount(dim3 launchGridDim, dim3 launchBlockDim)
     }
   }
   return s_shared_memory_amount_total;
+}
+
+int getCudaReductionMaxSeenBlocks(int id)
+{
+  return s_cuda_reduction_max_seen_blocks[id];
+}
+
+int resetCudaReductionMaxSeenBlocks(int id)
+{
+  int maxSeenBlocks = s_cuda_reduction_max_seen_blocks[id];
+  s_cuda_reduction_max_seen_blocks[id] = 0;
+  return maxSeenBlocks;
 }
 
 }  // closing brace for RAJA namespace

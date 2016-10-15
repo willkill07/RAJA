@@ -131,7 +131,6 @@ struct RAJA_ALIGNED_ATTR(DATA_ALIGN) CudaReductionDummyBlockType {
 struct CudaReductionDummyTallyType {
   CudaReductionDummyDataType dummy_tally;
   GridSizeType dummy_retiredBlocks;
-  GridSizeType dummy_maxSeenBlocks;
 };
 
 /*!
@@ -198,7 +197,6 @@ template <typename T>
 struct CudaReductionTallyType {
   T tally;
   GridSizeType retiredBlocks;
-  GridSizeType maxSeenBlocks;
 };
 
 /*!
@@ -233,7 +231,6 @@ template <typename T>
 struct CudaReductionLocTallyType {
   CudaReductionLocType<T> tally;
   GridSizeType retiredBlocks;
-  GridSizeType maxSeenBlocks;
 };
 
 
@@ -247,7 +244,7 @@ struct CudaReductionLocTallyType {
  *
  ******************************************************************************
  */
-int getCudaReductionId();
+int getCudaReductionId(int numThreads);
 
 /*!
  ******************************************************************************
@@ -357,7 +354,7 @@ void beforeCudaReadTallyBlock(int id)
  *
  ******************************************************************************
  */
-int getCudaSharedmemOffset(int id, dim3 reductionBlockDim, int size);
+int getCudaSharedmemOffset(int id, int size);
 
 /*!
  ******************************************************************************
@@ -365,12 +362,38 @@ int getCudaSharedmemOffset(int id, dim3 reductionBlockDim, int size);
  * \brief  Get the amount in bytes of shared memory required for the current
  *         kernel launch and checks the launch parameters.
  *
- * \param[in] launchGridDim GridDim kernel launch parameter.
- * \param[in] launchBlockDim BlockDim kernel launch parameter.
+ * \param[in] gridDim GridDim kernel launch parameter.
+ * \param[in] blockDim BlockDim kernel launch parameter.
  *
  ******************************************************************************
  */
-int getCudaSharedmemAmount(dim3 launchGridDim, dim3 launchBlockDim);
+int getCudaSharedmemAmount(dim3 gridDim, dim3 blockDim);
+
+/*!
+ ******************************************************************************
+ *
+ * \brief  Get the maximum number of blocks this reduction variable has been
+ *         launched with since last reset.
+ *
+ * \return int max number of blocks this reduction varaible has been launched
+ *             with since last reset.
+ *
+ ******************************************************************************
+ */
+int getCudaReductionMaxSeenBlocks(int id);
+
+/*!
+ ******************************************************************************
+ *
+ * \brief  Reset the maximum number of blocks this reduction variable has been
+ *         launched with to 0 and return the previous number.
+ *
+ * \return int max number of blocks this reduction varaible has been launched
+ *             with since last reset.
+ *
+ ******************************************************************************
+ */
+int resetCudaReductionMaxSeenBlocks(int id);
 
 /*!
  ******************************************************************************

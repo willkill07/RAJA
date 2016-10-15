@@ -118,7 +118,7 @@ namespace RAJA
  ******************************************************************************
  */
 template <typename EXEC_POLICY_T, typename LOOP_BODY>
-RAJA_INLINE void forall_Icount(const IndexSet& c, LOOP_BODY loop_body)
+RAJA_INLINE void forall_Icount(const IndexSet& c, LOOP_BODY&& loop_body)
 {
 
   forall_Icount(EXEC_POLICY_T(), c, loop_body);
@@ -134,7 +134,7 @@ RAJA_INLINE void forall_Icount(const IndexSet& c, LOOP_BODY loop_body)
 template <typename EXEC_POLICY_T, typename Container, typename LOOP_BODY>
 RAJA_INLINE void forall_Icount(Container&& c,
                                Index_type icount,
-                               LOOP_BODY loop_body)
+                               LOOP_BODY&& loop_body)
 {
   using Iterator = decltype(std::begin(c));
   using category = typename std::iterator_traits<Iterator>::iterator_category;
@@ -153,7 +153,7 @@ RAJA_INLINE void forall_Icount(Container&& c,
  ******************************************************************************
  */
 template <typename EXEC_POLICY_T, typename Container, typename LOOP_BODY>
-RAJA_INLINE void forall(Container&& c, LOOP_BODY loop_body)
+RAJA_INLINE void forall(Container&& c, LOOP_BODY&& loop_body)
 {
   auto begin = std::begin(c);
   auto end = std::end(c);
@@ -184,7 +184,7 @@ RAJA_INLINE void forall(Container&& c, LOOP_BODY loop_body)
  ******************************************************************************
  */
 template <typename EXEC_POLICY_T, typename LOOP_BODY>
-RAJA_INLINE void forall(Index_type begin, Index_type end, LOOP_BODY loop_body)
+RAJA_INLINE void forall(Index_type begin, Index_type end, LOOP_BODY&& loop_body)
 {
   forall<EXEC_POLICY_T>(RangeSegment(begin, end), loop_body);
 }
@@ -202,7 +202,7 @@ template <typename EXEC_POLICY_T, typename LOOP_BODY>
 RAJA_INLINE void forall_Icount(Index_type begin,
                                Index_type end,
                                Index_type icount,
-                               LOOP_BODY loop_body)
+                               LOOP_BODY&& loop_body)
 {
   forall_Icount(EXEC_POLICY_T(), RangeSegment(begin, end), icount, loop_body);
 }
@@ -226,7 +226,7 @@ template <typename EXEC_POLICY_T, typename LOOP_BODY>
 RAJA_INLINE void forall(Index_type begin,
                         Index_type end,
                         Index_type stride,
-                        LOOP_BODY loop_body)
+                        LOOP_BODY&& loop_body)
 {
   forall(EXEC_POLICY_T(), RangeStrideSegment(begin, end, stride), loop_body);
 }
@@ -245,7 +245,7 @@ RAJA_INLINE void forall_Icount(Index_type begin,
                                Index_type end,
                                Index_type stride,
                                Index_type icount,
-                               LOOP_BODY loop_body)
+                               LOOP_BODY&& loop_body)
 {
   forall_Icount(EXEC_POLICY_T(),
                 RangeStrideSegment(begin, end, stride),
@@ -271,7 +271,7 @@ RAJA_INLINE void forall_Icount(Index_type begin,
 template <typename EXEC_POLICY_T, typename LOOP_BODY>
 RAJA_INLINE void forall(const Index_type* idx,
                         Index_type len,
-                        LOOP_BODY loop_body)
+                        LOOP_BODY&& loop_body)
 {
   // turn into an iterator
   forall<EXEC_POLICY_T>(ListSegment(idx, len, Unowned), loop_body);
@@ -290,7 +290,7 @@ template <typename EXEC_POLICY_T, typename LOOP_BODY>
 RAJA_INLINE void forall_Icount(const Index_type* idx,
                                Index_type len,
                                Index_type icount,
-                               LOOP_BODY loop_body)
+                               LOOP_BODY&& loop_body)
 {
   // turn into an iterator
   forall_Icount<EXEC_POLICY_T>(ListSegment(idx, len, Unowned), icount, loop_body);
@@ -314,7 +314,7 @@ RAJA_INLINE void forall_Icount(const Index_type* idx,
  ******************************************************************************
  */
 template <typename EXEC_POLICY_T, typename LOOP_BODY>
-RAJA_INLINE void forall_segments(const IndexSet& iset, LOOP_BODY loop_body)
+RAJA_INLINE void forall_segments(const IndexSet& iset, LOOP_BODY&& loop_body)
 {
   forall_segments(EXEC_POLICY_T(), iset, loop_body);
 }

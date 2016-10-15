@@ -354,13 +354,21 @@ struct ForallN_Executor<ForallN_PolicyPair<CudaPolicy<CuARG0>, ISET0>,
 
   template <typename BODY, typename... CARGS>
   RAJA_INLINE void callLauncher(CudaDim const &dims,
-                                BODY body,
+                                BODY loop_body,
                                 CARGS const &... cargs) const
   {
-    cudaLauncherN<<<RAJA_CUDA_LAUNCH_PARAMS(dims.num_blocks, dims.num_threads)
-                 >>>(body, cargs...);
+    beforeCudaKernelLaunch();
+
+    {
+      auto body = loop_body;
+      
+      cudaLauncherN<<<RAJA_CUDA_LAUNCH_PARAMS(dims.num_blocks, dims.num_threads)
+                   >>>(body, cargs...);
+    }
                  
     RAJA_CUDA_CHECK_AND_SYNC(true);
+
+    afterCudaKernelLaunch();
   }
 };
 
@@ -374,15 +382,23 @@ struct ForallN_Executor<ForallN_PolicyPair<CudaPolicy<CuARG0>, ISET0>> {
   }
 
   template <typename BODY>
-  RAJA_INLINE void operator()(BODY body) const
+  RAJA_INLINE void operator()(BODY loop_body) const
   {
-    CudaDim dims;
-    CuARG0 c0(dims, iset0);
+    beforeCudaKernelLaunch();
 
-    cudaLauncherN<<<RAJA_CUDA_LAUNCH_PARAMS(dims.num_blocks, dims.num_threads)
-                 >>>(body, c0);
+    {
+      auto body = loop_body;
+
+      CudaDim dims;
+      CuARG0 c0(dims, iset0);
+
+      cudaLauncherN<<<RAJA_CUDA_LAUNCH_PARAMS(dims.num_blocks, dims.num_threads)
+                   >>>(body, c0);
+    }
 
     RAJA_CUDA_CHECK_AND_SYNC(true);
+
+    afterCudaKernelLaunch();
   }
 };
 

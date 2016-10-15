@@ -84,7 +84,7 @@ namespace HIDDEN
  *
  ******************************************************************************
  */
-template<typename T>
+template < typename T >
 __device__ __forceinline__ T shfl_xor(T var, int laneMask)
 {
   const int int_sizeof_T = 
@@ -101,57 +101,59 @@ __device__ __forceinline__ T shfl_xor(T var, int laneMask)
   return Tunion.var;
 }
 
+} // end HIDDEN namespace for helper functions
+
 // each block sums BLOCK_SIZE elements of arr[blockIdx.x * BLOCK_SIZE + threadIdx.x]
 // then adds the result to outptr[blockIdx.x]
-template < size_t BLOCK_SIZE >
+template < size_t BLOCK_SIZE, typename T >
 __global__ void reduceArraySum(T* arr, Index_type len, T* outptr)
 {
-  static_assert(BLOCK_SIZE % 32 == 0);
+  static_assert(BLOCK_SIZE % WARP_SIZE == 0, "Error: reduceArraySum BLOCK_SIZE "
+      "must be a multiple of " RAJA_STRINGIFY_MACRO(WARP_SIZE));
 
-  volatile __shared__ T sd[WARP_SIZE];
+  volatile __shared__ T sd[BLOCK_SIZE/WARP_SIZE];
 
   int threadId = threadIdx.x;
 
-  int warpId = threadId / WARP_SIZE;
-  int warpIdx = threadId % WARP_SIZE;
-
   int blockId = blockIdx.x;
-
-  int globalThreadId = threadId + blockId * BLOCK_SIZE;
 
   T temp = static_cast<T>(0);
 
-  if (threadId < WARP_SIZE) {
-    sd[threadId] = temp;
+  for ( int globalThreadId = threadId + blockId * BLOCK_SIZE; 
+        globalThreadId < len; 
+        globalThreadId += gridDim.x * BLOCK_SIZE ) {
+    temp += arr[globalThreadId];
   }
 
-  if (globalThreadId < len) {
-    temp = arr[globalThreadId];
-  }
-
-  __syncthreads();
-
-  for (int i = WARP_SIZE / 2; i > 0; i /= 2) {
-    T other_temp = shfl_xor<T>(temp, i);
-    temp += other_temp;
-  }
-
-  if (warpIdx < 1) {
-    sd[warpId] = temp;
-  }
-
-  __syncthreads();
-
-  if (threadId < WARP_SIZE) {
-
-    temp = sd[warpIdx];
+  if (BLOCK_SIZE > WARP_SIZE) {
 
     for (int i = WARP_SIZE / 2; i > 0; i /= 2) {
-      T other_temp = shfl_xor<T>(temp, i);
-      temp += other_temp;
+      temp += HIDDEN::shfl_xor<T>(temp, i);
     }
 
-    if (threadId < 1) {
+    int warpId = threadId / WARP_SIZE;
+    int warpIdx = threadId % WARP_SIZE;
+
+    if (warpIdx == 0) {
+      sd[warpId] = temp;
+    }
+
+    __syncthreads();
+
+    temp = static_cast<T>(0);
+
+    if (threadId < BLOCK_SIZE/WARP_SIZE) {
+      temp = sd[threadId];
+    }
+  }
+
+  if (threadId < WARP_SIZE) {
+
+    for (int i = WARP_SIZE / 2; i > 0; i /= 2) {
+      temp += HIDDEN::shfl_xor<T>(temp, i);
+    }
+
+    if (threadId == 0) {
       outptr[blockId] += temp;
     }
   }
@@ -163,7 +165,6 @@ enum struct responsibility : char {
   none = 2
 };
 
-} // end HIDDEN namespace for helper functions
 
 //
 //////////////////////////////////////////////////////////////////////
@@ -196,7 +197,7 @@ public:
   explicit ReduceMin(T init_val)
   {
     m_is_copy_host = false;
-    m_myID = getCudaReductionId();
+    m_myID = getCudaReductionId(BLOCK_SIZE);
     getCudaReductionTallyBlock(m_myID,
                                (void **)&m_tally_host,
                                (void **)&m_tally_device);
@@ -238,7 +239,7 @@ public:
     __syncthreads();
 #else
     m_is_copy_host = true;
-    m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
+    m_smem_offset = getCudaSharedmemOffset(m_myID, sizeof(T));
 #endif
   }
 
@@ -398,7 +399,7 @@ public:
   explicit ReduceMax(T init_val)
   {
     m_is_copy_host = false;
-    m_myID = getCudaReductionId();
+    m_myID = getCudaReductionId(BLOCK_SIZE);
     getCudaReductionTallyBlock(m_myID,
                                (void **)&m_tally_host,
                                (void **)&m_tally_device);
@@ -441,7 +442,7 @@ public:
     __syncthreads();
 #else
     m_is_copy_host = true;
-    m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
+    m_smem_offset = getCudaSharedmemOffset(m_myID, sizeof(T));
 #endif
   }
 
@@ -604,20 +605,24 @@ public:
       m_tally_host(nullptr),
       m_blockdata(nullptr),
       m_tally_device(nullptr),
-      m_myID(getCudaReductionId()),
+      m_myID(getCudaReductionId(BLOCK_SIZE)),
       m_smem_offset(-1),
-      m_finish_reduction_device(HIDDEN::responsibility::pass_to_next),
-      m_finish_reduction_host(HIDDEN::responsibility::pass_to_next),
+      m_maxSeenBlocks(0),
+      m_finish_reduction_device(responsibility::pass_to_next),
+      m_finish_reduction_host(responsibility::pass_to_next),
       m_is_copy_host(false)
   {
+    resetCudaReductionMaxSeenBlocks(m_myID);
     getCudaReductionMemBlock(m_myID, (void **)&m_blockdata);
     getCudaReductionTallyBlock(m_myID,
                                (void **)&m_tally_host,
                                (void **)&m_tally_device);
     m_tally_host->tally = init_val;
     m_tally_host->retiredBlocks = static_cast<GridSizeType>(0);
-    m_tally_host->maxSeenBlocks = static_cast<GridSizeType>(0);
   }
+
+  __host__ __device__
+  ReduceSum(ReduceSum<cuda_reduce<BLOCK_SIZE, Async>, T> &&other) = default;
 
   /*!
    * \brief Initialize shared memory on device, request shared memory on host.
@@ -635,9 +640,11 @@ public:
       m_myID(other.m_myID),
       m_smem_offset(other.m_smem_offset),
 #ifdef __CUDA_ARCH__
-      m_finish_reduction_device((other.m_finish_reduction_device == HIDDEN::responsibility::pass_to_next) ? HIDDEN::responsibility::mine : HIDDEN::responsibility::none),
+      m_maxSeenBlocks(other.m_maxSeenBlocks),
+      m_finish_reduction_device((other.m_finish_reduction_device == responsibility::pass_to_next) ? responsibility::mine : responsibility::none),
       m_finish_reduction_host(other.m_finish_reduction_host),
 #else
+      m_maxSeenBlocks(getCudaReductionMaxSeenBlocks(m_myID)),
       m_finish_reduction_device(other.m_finish_reduction_device),
       m_finish_reduction_host(other.m_finish_reduction_host),
 #endif
@@ -664,11 +671,13 @@ public:
 
     __syncthreads();
 #else
-    m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
-    if (m_finish_reduction_host == HIDDEN::responsibility::pass_to_next && m_smem_offset >= 0) {
-      m_finish_reduction_host = HIDDEN::responsibility::mine;
+    m_smem_offset = getCudaSharedmemOffset(m_myID, sizeof(T));
+    if (m_finish_reduction_host == responsibility::pass_to_next) {
+      if (m_smem_offset >= 0) {
+        m_finish_reduction_host = responsibility::mine;
+      }
     } else {
-      m_finish_reduction_host = HIDDEN::responsibility::none;
+      m_finish_reduction_host = responsibility::none;
     }
 #endif
   }
@@ -685,7 +694,7 @@ public:
   __host__ __device__ ~ReduceSum<cuda_reduce<BLOCK_SIZE, Async>, T>()
   {
 #if defined(__CUDA_ARCH__)
-    if (m_finish_reduction_device == HIDDEN::responsibility::mine) {
+    if (m_finish_reduction_device == responsibility::mine) {
       extern __shared__ unsigned char sd_block[];
       T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
 
@@ -715,47 +724,40 @@ public:
         T temp = sd[0];
         int blockId = blockIdx.x + blockIdx.y * gridDim.x
                     + gridDim.x * gridDim.y * blockIdx.z;
-        int maxSeenBlocks = m_tally_device->maxSeenBlocks;
         // write data to global memory block
-        if (blockId < maxSeenBlocks) {
+        if (blockId < m_maxSeenBlocks) {
           m_blockdata->values[blockId] += temp;
         } else {
           m_blockdata->values[blockId] = temp;
         }
-        int blocks = gridDim.x * gridDim.y * gridDim.z;
-        if (blocks > maxSeenBlocks) {
-          // increment counter, (wraps back to zero at second parameter)
-          unsigned int oldBlockCount =
-              atomicInc((unsigned int *)&m_tally_device->retiredBlocks,
-                        (blocks - 1));
-          if (oldBlockCount == (blocks - 1)) {
-            m_tally_device->maxSeenBlocks = blocks;
-          }
-        }
       }
     }
 #else
-    if (m_finish_reduction_host == HIDDEN::responsibility::mine) {
-      T* arr = m_blockdata->values;
-      int len = m_tally_host->maxSeenBlocks;
-      while (len > BLOCK_SIZE) {
+    if (m_finish_reduction_host == responsibility::mine) {
+      T* arr = &m_blockdata->values[0];
 
-        int blocks = len / BLOCK_SIZE;
-        int extra = len % BLOCK_SIZE;
-        int n = RAJA_DIVIDE_CEILING_INT(blocks - extra, BLOCK_SIZE+1);
-        blocks = blocks - n;
-        int curlen = blocks*BLOCK_SIZE;
+      int len = resetCudaReductionMaxSeenBlocks(m_myID);
 
-        reduceArraySum<BLOCK_SIZE><<<blocks, BLOCK_SIZE, 0, 0>>>
-            (arr, curlen, arr+curlen);
+      if (len > 0) {
+        while (len > BLOCK_SIZE) {
+
+          int blocks = len / BLOCK_SIZE;
+          int extra = len % BLOCK_SIZE;
+          int n = RAJA_DIVIDE_CEILING_INT(blocks - extra, BLOCK_SIZE+1);
+          blocks = blocks - n;
+          int curlen = blocks*BLOCK_SIZE;
+
+          reduceArraySum<BLOCK_SIZE, T><<<blocks, BLOCK_SIZE, 0, 0>>>
+              (arr, curlen, arr+curlen);
+          raja_cudaPeekAtLastError();
+
+          arr += curlen;
+          len -= curlen;
+        }
+        reduceArraySum<BLOCK_SIZE, T><<<1, BLOCK_SIZE, 0, 0>>>
+            (arr, len, &m_tally_device->tally);
         raja_cudaPeekAtLastError();
-
-        arr += curlen;
-        len -= curlen;
       }
-      reduceArraySum<BLOCK_SIZE><<<1, BLOCK_SIZE, 0, 0>>>
-          (arr, len, &m_tally_device->tally);
-      raja_cudaPeekAtLastError();
     }
     if (!m_is_copy_host) {
       releaseCudaReductionTallyBlock(m_myID);
@@ -833,12 +835,14 @@ private:
    */
   int m_smem_offset = -1;
 
+  int m_maxSeenBlocks = -1;
+
   /*!
    * \brief If this variable is a copy or not; only original may release memory 
    *        or perform finalization.
    */
-  HIDDEN::responsibility m_finish_reduction_device;
-  HIDDEN::responsibility m_finish_reduction_host;
+  responsibility m_finish_reduction_device;
+  responsibility m_finish_reduction_host;
   bool m_is_copy_host;
 
   // Sanity checks for block size and template type size
@@ -857,6 +861,11 @@ private:
   static_assert(sizeofcheck,
       "Error: type must be of size <= " 
       RAJA_STRINGIFY_MACRO(RAJA_CUDA_REDUCE_VAR_MAXSIZE));
+
+  // Force instantiation of reduceArraySum<BLOCK_SIZE, T> in host and 
+  // device complication.
+  static const constexpr auto reduceArraySumInstantiation = 
+      reduceArraySum<BLOCK_SIZE, T>;
 };
 
 /*!
@@ -882,7 +891,7 @@ public:
   explicit ReduceSum(T init_val)
   {
     m_is_copy_host = false;
-    m_myID = getCudaReductionId();
+    m_myID = getCudaReductionId(BLOCK_SIZE);
     getCudaReductionTallyBlock(m_myID,
                                (void **)&m_tally_host,
                                (void **)&m_tally_device);
@@ -925,7 +934,7 @@ public:
     __syncthreads();
 #else
     m_is_copy_host = true;
-    m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
+    m_smem_offset = getCudaSharedmemOffset(m_myID, sizeof(T));
 #endif
   }
 
@@ -1091,7 +1100,7 @@ public:
   explicit ReduceMinLoc(T init_val, Index_type init_loc)
   {
     m_is_copy_host = false;
-    m_myID = getCudaReductionId();
+    m_myID = getCudaReductionId(BLOCK_SIZE);
     getCudaReductionMemBlock(m_myID, (void **)&m_blockdata);
     getCudaReductionTallyBlock(m_myID,
                                (void **)&m_tally_host,
@@ -1143,8 +1152,7 @@ public:
 #else
     m_is_copy_host = true;
     m_smem_offset =
-        getCudaSharedmemOffset(m_myID, BLOCK_SIZE, 
-                               (sizeof(T) + sizeof(Index_type)));
+        getCudaSharedmemOffset(m_myID, (sizeof(T) + sizeof(Index_type)));
 #endif
   }
 
@@ -1404,7 +1412,7 @@ public:
   explicit ReduceMaxLoc(T init_val, Index_type init_loc)
   {
     m_is_copy_host = false;
-    m_myID = getCudaReductionId();
+    m_myID = getCudaReductionId(BLOCK_SIZE);
     getCudaReductionMemBlock(m_myID, (void **)&m_blockdata);
     getCudaReductionTallyBlock(m_myID,
                                (void **)&m_tally_host,
@@ -1456,8 +1464,7 @@ public:
 #else
     m_is_copy_host = true;
     m_smem_offset =
-        getCudaSharedmemOffset(m_myID, BLOCK_SIZE, 
-                               (sizeof(T) + sizeof(Index_type)));
+        getCudaSharedmemOffset(m_myID, (sizeof(T) + sizeof(Index_type)));
 #endif
   }
 
