@@ -101,8 +101,6 @@ __device__ __forceinline__ T shfl_xor(T var, int laneMask)
   return Tunion.var;
 }
 
-} // end HIDDEN namespace for helper functions
-
 // each block sums BLOCK_SIZE elements of arr[blockIdx.x * BLOCK_SIZE + threadIdx.x]
 // then adds the result to outptr[blockIdx.x]
 template < size_t BLOCK_SIZE, typename T >
@@ -128,7 +126,7 @@ __global__ void reduceArraySum(T* arr, Index_type len, T* outptr)
   if (BLOCK_SIZE > WARP_SIZE) {
 
     for (int i = WARP_SIZE / 2; i > 0; i /= 2) {
-      temp += HIDDEN::shfl_xor<T>(temp, i);
+      temp += shfl_xor<T>(temp, i);
     }
 
     int warpId = threadId / WARP_SIZE;
@@ -150,7 +148,7 @@ __global__ void reduceArraySum(T* arr, Index_type len, T* outptr)
   if (threadId < WARP_SIZE) {
 
     for (int i = WARP_SIZE / 2; i > 0; i /= 2) {
-      temp += HIDDEN::shfl_xor<T>(temp, i);
+      temp += shfl_xor<T>(temp, i);
     }
 
     if (threadId == 0) {
@@ -159,12 +157,13 @@ __global__ void reduceArraySum(T* arr, Index_type len, T* outptr)
   }
 }
 
+} // end HIDDEN namespace for helper functions
+
 enum struct responsibility : char {
   pass_to_next = 0,
   mine = 1,
   none = 2
 };
-
 
 //
 //////////////////////////////////////////////////////////////////////
@@ -652,7 +651,7 @@ public:
   {
 #if defined(__CUDA_ARCH__)
     extern __shared__ unsigned char sd_block[];
-    T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
+    volatile T *sd = reinterpret_cast<volatile T *>(&sd_block[m_smem_offset]);
 
     int threadId = threadIdx.x + blockDim.x * threadIdx.y
                    + (blockDim.x * blockDim.y) * threadIdx.z;
@@ -696,7 +695,7 @@ public:
 #if defined(__CUDA_ARCH__)
     if (m_finish_reduction_device == responsibility::mine) {
       extern __shared__ unsigned char sd_block[];
-      T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
+      volatile T *sd = reinterpret_cast<volatile T *>(&sd_block[m_smem_offset]);
 
       int threadId = threadIdx.x + blockDim.x * threadIdx.y
                      + (blockDim.x * blockDim.y) * threadIdx.z;
@@ -747,14 +746,14 @@ public:
           blocks = blocks - n;
           int curlen = blocks*BLOCK_SIZE;
 
-          reduceArraySum<BLOCK_SIZE, T><<<blocks, BLOCK_SIZE, 0, 0>>>
+          HIDDEN::reduceArraySum<BLOCK_SIZE, T><<<blocks, BLOCK_SIZE, 0, 0>>>
               (arr, curlen, arr+curlen);
           raja_cudaPeekAtLastError();
 
           arr += curlen;
           len -= curlen;
         }
-        reduceArraySum<BLOCK_SIZE, T><<<1, BLOCK_SIZE, 0, 0>>>
+        HIDDEN::reduceArraySum<BLOCK_SIZE, T><<<1, BLOCK_SIZE, 0, 0>>>
             (arr, len, &m_tally_device->tally);
         raja_cudaPeekAtLastError();
       }
@@ -793,7 +792,7 @@ public:
       T val) const
   {
     extern __shared__ unsigned char sd_block[];
-    T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
+    volatile T *sd = reinterpret_cast<volatile T *>(&sd_block[m_smem_offset]);
 
     int threadId = threadIdx.x + blockDim.x * threadIdx.y
                    + (blockDim.x * blockDim.y) * threadIdx.z;
@@ -865,7 +864,7 @@ private:
   // Force instantiation of reduceArraySum<BLOCK_SIZE, T> in host and 
   // device complication.
   static const constexpr auto reduceArraySumInstantiation = 
-      reduceArraySum<BLOCK_SIZE, T>;
+      HIDDEN::reduceArraySum<BLOCK_SIZE, T>;
 };
 
 /*!
