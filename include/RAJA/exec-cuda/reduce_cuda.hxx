@@ -117,8 +117,8 @@ __global__ void reduceArraySum(T* arr, Index_type len, T* outptr)
 
   T temp = static_cast<T>(0);
 
-  for ( int globalThreadId = threadId + blockId * BLOCK_SIZE; 
-        globalThreadId < len; 
+  for ( int globalThreadId = threadId + blockId * BLOCK_SIZE;
+        globalThreadId < len;
         globalThreadId += gridDim.x * BLOCK_SIZE ) {
     temp += arr[globalThreadId];
   }
@@ -138,11 +138,7 @@ __global__ void reduceArraySum(T* arr, Index_type len, T* outptr)
 
     __syncthreads();
 
-    temp = static_cast<T>(0);
-
-    if (threadId < BLOCK_SIZE/WARP_SIZE) {
-      temp = sd[threadId];
-    }
+    temp = (threadId < BLOCK_SIZE/WARP_SIZE) ? sd[threadId] : static_cast<T>(0);
   }
 
   if (threadId < WARP_SIZE) {
@@ -735,25 +731,26 @@ public:
     if (m_finish_reduction_host == responsibility::mine) {
       T* arr = &m_blockdata->values[0];
 
-      int len = resetCudaReductionMaxSeenBlocks(m_myID);
+      cudaStream_t reduce_stream;
+      int len = resetCudaReductionMaxSeenBlocks(m_myID, &reduce_stream);
 
       if (len > 0) {
-        while (len > BLOCK_SIZE) {
+        while (len > REDUCE_BLOCK_SIZE) {
 
-          int blocks = len / BLOCK_SIZE;
-          int extra = len % BLOCK_SIZE;
-          int n = RAJA_DIVIDE_CEILING_INT(blocks - extra, BLOCK_SIZE+1);
+          int blocks = len / REDUCE_BLOCK_SIZE;
+          int extra = len % REDUCE_BLOCK_SIZE;
+          int n = RAJA_DIVIDE_CEILING_INT(blocks - extra, REDUCE_BLOCK_SIZE+1);
           blocks = blocks - n;
-          int curlen = blocks*BLOCK_SIZE;
+          int curlen = blocks*REDUCE_BLOCK_SIZE;
 
-          HIDDEN::reduceArraySum<BLOCK_SIZE, T><<<blocks, BLOCK_SIZE, 0, 0>>>
+          reduceArraySumInstantiation<<<blocks, REDUCE_BLOCK_SIZE, 0, reduce_stream>>>
               (arr, curlen, arr+curlen);
           raja_cudaPeekAtLastError();
 
           arr += curlen;
           len -= curlen;
         }
-        HIDDEN::reduceArraySum<BLOCK_SIZE, T><<<1, BLOCK_SIZE, 0, 0>>>
+        reduceArraySumInstantiation<<<1, REDUCE_BLOCK_SIZE, 0, reduce_stream>>>
             (arr, len, &m_tally_device->tally);
         raja_cudaPeekAtLastError();
       }
@@ -861,10 +858,12 @@ private:
       "Error: type must be of size <= " 
       RAJA_STRINGIFY_MACRO(RAJA_CUDA_REDUCE_VAR_MAXSIZE));
 
-  // Force instantiation of reduceArraySum<BLOCK_SIZE, T> in host and 
+  static const constexpr int REDUCE_BLOCK_SIZE = 128;
+
+  // Force instantiation of reduceArraySum<REDUCE_BLOCK_SIZE, T> in host and 
   // device complication.
   static const constexpr auto reduceArraySumInstantiation = 
-      HIDDEN::reduceArraySum<BLOCK_SIZE, T>;
+      HIDDEN::reduceArraySum<REDUCE_BLOCK_SIZE, T>;
 };
 
 /*!

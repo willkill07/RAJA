@@ -80,6 +80,8 @@ namespace
   /////////////////////////////////////////////////////////////////////////////
   //
 
+  int s_cuda_reduction_initialized = false;
+
   /*!
    * \brief Holds the number of threads expected by each reduction variable.
    * 
@@ -92,6 +94,8 @@ namespace
    * forall.
    */
   int s_cuda_reduction_num_threads[RAJA_MAX_REDUCE_VARS] = {0};
+
+  cudaStream_t s_cuda_reduction_streams[RAJA_MAX_REDUCE_VARS] = {0};
 
   /*!
    * \brief Holds the maximum number of blocks each reduction variable has been
@@ -194,6 +198,23 @@ namespace
    */
   int s_shared_memory_offsets[RAJA_MAX_REDUCE_VARS] = {-1};
 }
+
+/*
+*******************************************************************************
+*
+* Free managed memory blocks used in RAJA-Cuda reductions.
+*
+*******************************************************************************
+*/
+void freeCudaReductionStreams()
+{
+  if (s_cuda_reduction_initialized) {
+    for (int id = 0; id < RAJA_MAX_REDUCE_VARS; ++id) {
+      raja_cudaErrchk(cudaStreamDestroy(s_cuda_reduction_streams[id]));
+    }
+  }
+}
+
 /*
 *******************************************************************************
 *
@@ -204,14 +225,17 @@ namespace
 */
 int getCudaReductionId(int numThreads)
 {
-  static int first_time_called = true;
-
-  if (first_time_called) {
+  if (!s_cuda_reduction_initialized) {
     for (int id = 0; id < RAJA_MAX_REDUCE_VARS; ++id) {
       s_cuda_reduction_num_threads[id] = 0;
     }
+    for (int id = 0; id < RAJA_MAX_REDUCE_VARS; ++id) {
+      raja_cudaErrchk(cudaStreamCreateWithFlags(&s_cuda_reduction_streams[id], cudaStreamDefault));
+    }
 
-    first_time_called = false;
+    s_cuda_reduction_initialized = true;
+
+    atexit(freeCudaReductionStreams);
   }
 
   int id = 0;
@@ -575,8 +599,11 @@ int getCudaReductionMaxSeenBlocks(int id)
   return s_cuda_reduction_max_seen_blocks[id];
 }
 
-int resetCudaReductionMaxSeenBlocks(int id)
+int resetCudaReductionMaxSeenBlocks(int id, cudaStream_t* reduction_stream)
 {
+  if (reduction_stream != nullptr) {
+    *reduction_stream = s_cuda_reduction_streams[id];
+  }
   int maxSeenBlocks = s_cuda_reduction_max_seen_blocks[id];
   s_cuda_reduction_max_seen_blocks[id] = 0;
   return maxSeenBlocks;

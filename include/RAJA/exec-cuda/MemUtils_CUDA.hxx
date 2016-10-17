@@ -393,7 +393,7 @@ int getCudaReductionMaxSeenBlocks(int id);
  *
  ******************************************************************************
  */
-int resetCudaReductionMaxSeenBlocks(int id);
+int resetCudaReductionMaxSeenBlocks(int id, cudaStream_t* reduction_stream = nullptr);
 
 /*!
  ******************************************************************************
