@@ -33,7 +33,7 @@ template <typename T>
 bool equal(T a, T b)
 {
   return (rcabs(a - b)
-          <= ((rcabs(a) < rcabs(b) ? rcabs(a) : rcabs(b)) * T(1.0e-12)));
+          <= ((rcabs(a) < rcabs(b) ? rcabs(a) : rcabs(b)) * T(1.0e-11)));
 }
 
 //
