@@ -66,6 +66,7 @@
 #include <iostream>
 #include <string>
 #include <cassert>
+#include <cstring>
 
 namespace RAJA
 {
@@ -76,12 +77,24 @@ namespace
    * \brief Static array used to keep track of which unique ids
    * for CUDA reduction objects are used and which are not.
    */
-  bool s_cuda_reduction_id_used[RAJA_MAX_REDUCE_VARS];
+  bool* s_cuda_reduction_id_used = nullptr;
+
+  /*!
+   * \brief Pointer to host values for RAJA-Cuda reductions.
+   */
+  CudaReductionDummyDataType* s_cuda_reduction_host_values = nullptr;
+
+  /*!
+   * \brief Pointer to init device values for RAJA-Cuda reductions.
+   */
+  CudaReductionDummyDataType* s_cuda_reduction_init_device_values = nullptr;
+
+  
 
   /*!
    * \brief Pointer to device memory block for RAJA-Cuda reductions.
    */
-  CudaReductionDummyBlockType* s_cuda_reduction_mem_block = 0;
+  CudaReductionDummyBlockType* s_cuda_reduction_mem_block = nullptr;
 
   /*!
    * \brief Pointer to the tally block on the device.
@@ -90,7 +103,7 @@ namespace
    * results of cuda reduction variables are stored. This is done so all 
    * results may be copied back to the host with one memcpy.
    */
-  CudaReductionDummyTallyType* s_cuda_reduction_tally_block_device = 0;
+  CudaReductionDummyTallyType* s_cuda_reduction_tally_block_device = nullptr;
 
   /*!
    * \brief Pointer to the tally block cache on the host.
@@ -112,7 +125,7 @@ namespace
    * synchronizing managed memory incurs a smaller penalty inthe future, then
    * using other memory types could take less time.
    */
-  CudaReductionDummyTallyType* s_cuda_reduction_tally_block_host = 0;
+  CudaReductionDummyTallyType* s_cuda_reduction_tally_block_host = nullptr;
 
   //
   /////////////////////////////////////////////////////////////////////////////
@@ -140,7 +153,15 @@ namespace
    * True indicates a slot written to by the host, but not copied back to
    * the device tally block.
    */
-  bool s_tally_block_dirty[RAJA_CUDA_REDUCE_TALLY_LENGTH] = {false};
+  bool* s_tally_block_dirty = nullptr;
+
+  /*!
+   * \brief Holds the assigned status of each slot.
+   *
+   * Note: This is used to initialize the each slot in the host tally 
+   * exactly one time.
+   */
+  bool* s_tally_block_assigned = nullptr;
 
   //
   /////////////////////////////////////////////////////////////////////////////
@@ -154,7 +175,7 @@ namespace
    * \brief State of the host code, whether it is currently in a raja
    *        forall function or not.
    */
-  bool s_in_raja_forall = false;
+  bool s_in_raja_cuda_forall = false;
   /*!
    * \brief The amount of shared memory currently earmarked for use in
    *        the current forall.
@@ -172,7 +193,7 @@ namespace
    * \brief Holds the number of threads expected by each reduction variable.
    * 
    * This is used to check the execution policy against the reduction policies
-   * of participating reduction varaibles. 
+   * of participating reduction varaibles.
    *
    * Note: -1 indicates a reduction variable that is not participating in the 
    * current forall and 0 represents a reduction variable whose execution does
@@ -180,6 +201,23 @@ namespace
    */
   int s_cuda_reduction_num_threads[RAJA_MAX_REDUCE_VARS] = {-1};
 }
+
+
+/*
+*******************************************************************************
+*
+* Free host values memory block used in RAJA-Cuda reductions.
+*
+*******************************************************************************
+*/
+void freeCudaReductionIdValues()
+{
+  delete[] s_cuda_reduction_id_used;
+  delete[] s_cuda_reduction_host_values;
+  delete[] s_cuda_reduction_init_device_values;
+  delete[] s_tally_block_assigned;
+}
+
 /*
 *******************************************************************************
 *
@@ -188,16 +226,30 @@ namespace
 *
 *******************************************************************************
 */
-int getCudaReductionId()
+int getCudaReductionId_impl(void** host_val, void** init_dev_val)
 {
   static int first_time_called = true;
 
   if (first_time_called) {
-    for (int id = 0; id < RAJA_MAX_REDUCE_VARS; ++id) {
-      s_cuda_reduction_id_used[id] = false;
+
+    s_cuda_reduction_id_used = new bool[RAJA_MAX_REDUCE_VARS];
+
+    s_cuda_reduction_host_values = 
+        new CudaReductionDummyDataType[RAJA_MAX_REDUCE_VARS];
+
+    s_cuda_reduction_init_device_values =
+        new CudaReductionDummyDataType[RAJA_MAX_REDUCE_VARS];
+
+    s_tally_block_assigned = new bool[RAJA_MAX_REDUCE_VARS];
+
+    for (int i = 0; i < RAJA_MAX_REDUCE_VARS; ++i) {
+      s_cuda_reduction_id_used[i] = false;
+      s_tally_block_assigned[i] = false;
     }
 
     first_time_called = false;
+
+    atexit(freeCudaReductionIdValues);
   }
 
   int id = 0;
@@ -212,6 +264,9 @@ int getCudaReductionId()
   }
 
   s_cuda_reduction_id_used[id] = true;
+
+  host_val[0] = &s_cuda_reduction_host_values[id];
+  init_dev_val[0] = &s_cuda_reduction_init_device_values[id];
 
   return id;
 }
@@ -240,7 +295,7 @@ void releaseCudaReductionId(int id)
 */
 void getCudaReductionMemBlock(int id, void** device_memblock)
 {
-  if (s_cuda_reduction_mem_block == 0) {
+  if (s_cuda_reduction_mem_block == nullptr) {
     cudaErrchk(cudaMalloc((void**)&s_cuda_reduction_mem_block,
                           sizeof(CudaReductionDummyBlockType) *
                             RAJA_MAX_REDUCE_VARS));
@@ -260,9 +315,9 @@ void getCudaReductionMemBlock(int id, void** device_memblock)
 */
 void freeCudaReductionMemBlock()
 {
-  if (s_cuda_reduction_mem_block != 0) {
+  if (s_cuda_reduction_mem_block != nullptr) {
     cudaErrchk(cudaFree(s_cuda_reduction_mem_block));
-    s_cuda_reduction_mem_block = 0;
+    s_cuda_reduction_mem_block = nullptr;
   }
 }
 
@@ -277,31 +332,50 @@ void freeCudaReductionMemBlock()
 *
 *******************************************************************************
 */
-void getCudaReductionTallyBlock(int id, void** host_tally, void** device_tally)
+CudaReductionDummyDataType* getCudaReductionTallyBlock_impl(
+                              int id, void** host_tally, void** device_tally)
 {
-  if (s_cuda_reduction_tally_block_host == 0) {
-    s_cuda_reduction_tally_block_host = 
-        new CudaReductionDummyTallyType[RAJA_CUDA_REDUCE_TALLY_LENGTH];
+  CudaReductionDummyDataType* init_dev_val_ptr = nullptr;
 
-    cudaErrchk(cudaMalloc((void**)&s_cuda_reduction_tally_block_device,
-                          sizeof(CudaReductionDummyTallyType) *
-                            RAJA_CUDA_REDUCE_TALLY_LENGTH));
+  if (s_in_raja_cuda_forall) {
 
-    s_tally_valid = true;
-    s_tally_dirty = 0;
-    for (int i = 0; i < RAJA_CUDA_REDUCE_TALLY_LENGTH; ++i) {
-      s_tally_block_dirty[i] = false;
+    if (s_cuda_reduction_tally_block_host == nullptr) {
+
+      s_tally_block_dirty = new bool[RAJA_CUDA_REDUCE_TALLY_LENGTH];
+
+      s_cuda_reduction_tally_block_host = 
+          new CudaReductionDummyTallyType[RAJA_CUDA_REDUCE_TALLY_LENGTH];
+
+      cudaErrchk(cudaMalloc((void**)&s_cuda_reduction_tally_block_device,
+                            sizeof(CudaReductionDummyTallyType) *
+                              RAJA_CUDA_REDUCE_TALLY_LENGTH));
+
+      s_tally_valid = true;
+      s_tally_dirty = 0;
+      for (int i = 0; i < RAJA_CUDA_REDUCE_TALLY_LENGTH; ++i) {
+        s_tally_block_dirty[i] = false;
+      }
+
+      atexit(freeCudaReductionTallyBlock);
     }
 
-    atexit(freeCudaReductionTallyBlock);
+    if (!s_tally_block_assigned[id]) {
+      s_tally_dirty += 1;
+      // set block dirty
+      s_tally_block_dirty[id] = true;
+
+      init_dev_val_ptr = &s_cuda_reduction_init_device_values[id];
+      s_tally_block_assigned[id] = true;
+
+      memset(&s_cuda_reduction_tally_block_host[id], 0, 
+                        sizeof(CudaReductionDummyTallyType));
+    }
+
+    *host_tally   = &(s_cuda_reduction_tally_block_host[id]);
+    *device_tally = &(s_cuda_reduction_tally_block_device[id]);
   }
 
-  s_tally_dirty += 1;
-  // set block dirty
-  s_tally_block_dirty[id] = true;
-
-  *host_tally   = &(s_cuda_reduction_tally_block_host[id]);
-  *device_tally = &(s_cuda_reduction_tally_block_device[id]);
+  return init_dev_val_ptr;
 }
 
 /*
@@ -387,7 +461,7 @@ static void readCudaReductionTallyBlock()
 */
 void beforeCudaKernelLaunch()
 {
-  s_in_raja_forall = true;
+  s_in_raja_cuda_forall = true;
   s_shared_memory_amount_total = 0;
   for(int i = 0; i < RAJA_MAX_REDUCE_VARS; ++i) {
     s_shared_memory_offsets[i] = -1;
@@ -395,10 +469,9 @@ void beforeCudaKernelLaunch()
   for(int i = 0; i < RAJA_MAX_REDUCE_VARS; ++i) {
     s_cuda_reduction_num_threads[i] = -1;
   }
-
-  s_tally_valid = false;
-  writeBackCudaReductionTallyBlock();
 }
+
+
 
 /*
 *******************************************************************************
@@ -410,7 +483,7 @@ void beforeCudaKernelLaunch()
 */
 void afterCudaKernelLaunch()
 {
-  s_in_raja_forall = false;
+  s_in_raja_cuda_forall = false;
   s_shared_memory_amount_total = 0;
 }
 
@@ -427,20 +500,30 @@ void afterCudaKernelLaunch()
 *
 *******************************************************************************
 */
-void beforeCudaReadTallyBlockAsync(int id)
+CudaReductionDummyDataType* beforeCudaReadTallyBlockAsync(int id)
 {
-  if (!s_tally_block_dirty[id]) {
-    writeBackCudaReductionTallyBlock();
-    readCudaReductionTallyBlockAsync();
+  CudaReductionDummyDataType* data = nullptr;
+  if (s_tally_block_assigned[id]) {
+    if (!s_tally_block_dirty[id]) {
+      writeBackCudaReductionTallyBlock();
+      readCudaReductionTallyBlockAsync();
+    }
+    data = &s_cuda_reduction_tally_block_host[id].dummy_val;
   }
+  return data;
 }
 ///
-void beforeCudaReadTallyBlockSync(int id)
+CudaReductionDummyDataType* beforeCudaReadTallyBlockSync(int id)
 {
-  if (!s_tally_block_dirty[id]) {
-    writeBackCudaReductionTallyBlock();
-    readCudaReductionTallyBlock();
+  CudaReductionDummyDataType* data = nullptr;
+  if (s_tally_block_assigned[id]) {
+    if (!s_tally_block_dirty[id]) {
+      writeBackCudaReductionTallyBlock();
+      readCudaReductionTallyBlock();
+    }
+    data = &s_cuda_reduction_tally_block_host[id].dummy_val;
   }
+  return data;
 }
 
 /*
@@ -452,9 +535,12 @@ void beforeCudaReadTallyBlockSync(int id)
 */
 void releaseCudaReductionTallyBlock(int id)
 {
-  if (s_tally_block_dirty[id]) {
-    s_tally_block_dirty[id] = false;
-    s_tally_dirty -= 1;
+  if (s_tally_block_assigned[id]) {
+    if (s_tally_block_dirty[id]) {
+      s_tally_block_dirty[id] = false;
+      s_tally_dirty -= 1;
+    }
+    s_tally_block_assigned[id] = false;
   }
 }
 
@@ -467,10 +553,13 @@ void releaseCudaReductionTallyBlock(int id)
 */
 void freeCudaReductionTallyBlock()
 {
-  if (s_cuda_reduction_tally_block_host != 0) {
+  if (s_cuda_reduction_tally_block_host != nullptr) {
+    delete[] s_tally_block_dirty;
     delete[] s_cuda_reduction_tally_block_host;
     cudaErrchk(cudaFree(s_cuda_reduction_tally_block_device));
-    s_cuda_reduction_tally_block_host = 0;
+    s_cuda_reduction_tally_block_host = nullptr;
+    s_tally_block_dirty = nullptr;
+    s_cuda_reduction_tally_block_device = nullptr;
   }
 }
 
@@ -486,7 +575,7 @@ int getCudaSharedmemOffset(int id, dim3 reductionBlockDim, int size)
 {
   assert(id < RAJA_MAX_REDUCE_VARS);
 
-  if (s_in_raja_forall) {
+  if (s_in_raja_cuda_forall) {
     if (s_shared_memory_offsets[id] < 0) {
       // in a forall and have not yet gotten shared memory
 
@@ -546,6 +635,11 @@ int getCudaSharedmemAmount(dim3 launchGridDim, dim3 launchBlockDim)
       exit(1);
     }
   }
+
+  // 
+  s_tally_valid = false;
+  writeBackCudaReductionTallyBlock();
+
   return s_shared_memory_amount_total;
 }
 

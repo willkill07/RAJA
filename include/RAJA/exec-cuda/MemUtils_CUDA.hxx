@@ -202,49 +202,29 @@ struct CudaReductionTallyType {
 /*!
  ******************************************************************************
  *
- * \brief Type used to simplify hold tally value in cuda atomic reductions.
- *
- * Must fit within the dummy tally type (checked in static assert in the
- * reduction classes).
- *
- ******************************************************************************
- */
-template <typename T>
-struct CudaReductionTallyTypeAtomic {
-  T tally;
-};
-
-/*!
- ******************************************************************************
- *
- * \brief Type used to simplify hold tally value in cuda Loc reductions.
- *
- * Must fit within the dummy tally type (checked in static assert in the
- * reduction classes).
- *
- * Note: Retired blocks is used to count the number of blocks that finished
- * and wrote their portion of the reduction to the memory block.
- *
- ******************************************************************************
- */
-template <typename T>
-struct CudaReductionLocTallyType {
-  CudaReductionLocType<T> tally;
-  GridSizeType retiredBlocks;
-};
-
-
-/*!
- ******************************************************************************
- *
  * \brief Get a valid reduction id, or complain and exit if no valid id is 
  *        available.
+ *
+ * \param[in] init_val_host initial value of reduction on the host.
+ * \param[in] init_val_device initial value of reduction on the device.
+ *
+ * \param[out] host_val pointer to host value slot.
  *
  * \return int the next available valid reduction id.
  *
  ******************************************************************************
  */
-int getCudaReductionId();
+int getCudaReductionId_impl(void** host_val, void** init_dev_val);
+///
+template < typename T >
+int getCudaReductionId(T init_val_host, T init_val_device, void** host_val)
+{
+  void* init_dev_val;
+  int id = getCudaReductionId_impl(host_val, &init_dev_val);
+  ((T**)host_val)[0][0] = init_val_host;
+  ((T*)init_dev_val)[0] = init_val_device;
+  return id;
+}
 
 /*!
  ******************************************************************************
@@ -272,7 +252,18 @@ void releaseCudaReductionId(int id);
  *
  ******************************************************************************
  */
-void getCudaReductionTallyBlock(int id, void** host_tally, void** device_tally);
+CudaReductionDummyDataType* getCudaReductionTallyBlock_impl(
+                          int id, void** host_tally, void** device_tally);
+///
+template < typename T >
+void getCudaReductionTallyBlock(int id, void** host_tally, void** device_tally)
+{
+  CudaReductionDummyDataType* init_val_device = 
+      getCudaReductionTallyBlock_impl(id, host_tally, device_tally);
+  if (init_val_device != nullptr) {
+    ((CudaReductionTallyType<T>**)host_tally)[0][0].tally = ((T*)init_val_device)[0];
+  }
+}
 
 /*!
  ******************************************************************************
@@ -310,7 +301,7 @@ void afterCudaKernelLaunch();
  *
  ******************************************************************************
  */
-void beforeCudaReadTallyBlockAsync(int id);
+CudaReductionDummyDataType* beforeCudaReadTallyBlockAsync(int id);
 
 /*!
  ******************************************************************************
@@ -320,7 +311,7 @@ void beforeCudaReadTallyBlockAsync(int id);
  *
  ******************************************************************************
  */
-void beforeCudaReadTallyBlockSync(int id);
+CudaReductionDummyDataType* beforeCudaReadTallyBlockSync(int id);
 
 /*!
  ******************************************************************************
@@ -328,16 +319,20 @@ void beforeCudaReadTallyBlockSync(int id);
  * \brief Updates host tally cache for read by reduction variable with id and 
  * templated on Async from the reduction policy.
  *
+ * \return int Byte offset into dynamic shared memory.
+ *
  ******************************************************************************
  */
-template<bool Async>
-void beforeCudaReadTallyBlock(int id)
+template<typename T, bool Async>
+T* beforeCudaReadTallyBlock(int id)
 {
+  CudaReductionDummyDataType* dev_data = nullptr;
   if (Async) {
-    beforeCudaReadTallyBlockAsync(id);
+    dev_data = beforeCudaReadTallyBlockAsync(id);
   } else {
-    beforeCudaReadTallyBlockSync(id);
+    dev_data = beforeCudaReadTallyBlockSync(id);
   }
+  return (T*)dev_data;
 }
 
 /*!
