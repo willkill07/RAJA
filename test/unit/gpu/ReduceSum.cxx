@@ -66,6 +66,19 @@ int main(int argc, char *argv[])
                     sizeof(double) * TEST_VEC_LEN,
                     cudaMemAttachGlobal);
 
+  double *hdvalue;
+  int* hivalue;
+
+  hdvalue = (double*)malloc(sizeof(double) * TEST_VEC_LEN);
+  for (int i = 0; i < TEST_VEC_LEN; ++i) {
+    hdvalue[i] = dinit_val;
+  }
+
+  hivalue = (int*)malloc(sizeof(int) * TEST_VEC_LEN);
+  for (int i = 0; i < TEST_VEC_LEN; ++i) {
+    hivalue[i] = iinit_val;
+  }
+
   ///
   /// Define thread block size for CUDA exec policy
   ///
@@ -270,10 +283,20 @@ int main(int argc, char *argv[])
       }
 
     }  // end test 3
-    {// Begin test4
 
-      ReduceSum<cuda_reduce_atomic<block_size>, double> dsumN(0.0);
-      ReduceSum<cuda_reduce_atomic<block_size>, double> dsumP(0.0);
+    ////////////////////////////////////////////////////////////////////////////
+
+    //
+    // test 4 runs 2 reductions (2 atomic double and 2 non-atomic double) over 
+    //        the array conditionally summing positive and negative values 
+    //        into separate reduction variables.
+    //
+    {// Begin test 4
+
+      ReduceSum<cuda_reduce_atomic<block_size>, double> dsumNa(0.0);
+      ReduceSum<cuda_reduce_atomic<block_size>, double> dsumPa(0.0);
+      ReduceSum<cuda_reduce<block_size>, double> dsumN(0.0);
+      ReduceSum<cuda_reduce<block_size>, double> dsumP(0.0);
       double neg_chk_val, pos_chk_val;
 
       neg_chk_val = pos_chk_val = 0.0;  
@@ -291,30 +314,102 @@ int main(int argc, char *argv[])
             pos_chk_val += rand_dvalue[i];
           } 
         }
+
         forall<cuda_exec<block_size> >(0,
                                        TEST_VEC_LEN,
                                        [=] __device__(int i) {
           if(rand_dvalue[i] < 0.0) {
+            dsumNa += rand_dvalue[i];
             dsumN += rand_dvalue[i];
           }
           else {
+            dsumPa += rand_dvalue[i];
             dsumP += rand_dvalue[i];
           }
         });
 
-        //fprintf(stderr,"pos_chk_val %0.12lf : dsumP %0.12lf : EPS %0.12lf\n",pos_chk_val,double(dsumP),std::abs(pos_chk_val - double(dsumP)));
-        //fprintf(stderr,"neg_chk_val %0.12lf : dsumN %0.12lf : EPS %0.12lf\n",neg_chk_val,double(dsumN),std::abs(neg_chk_val - double(dsumN)));
-        if (!(std::abs(double(dsumN) - neg_chk_val) < 4e-8)
-            || !(std::abs(double(dsumP) - pos_chk_val) < 4e-8)) {
-
-          cout << "\n TEST 4 FAILURE: tcount, k = " << tcount << " , " << k
-               << endl;
+        if (!equal(double(dsumNa), neg_chk_val)
+            || !equal(double(dsumPa), pos_chk_val)
+            || !equal(double(dsumN), neg_chk_val)
+            || !equal(double(dsumP), pos_chk_val)) {
+          cout << "\n TEST 4 FAILURE: tcount = " << tcount << endl;
+          cout << setprecision(20) << "\tdsumNa = " << static_cast<double>(dsumNa)
+               << " (" << neg_chk_val << ") " << endl;
+          cout << setprecision(20) << "\tdsumPa = " << static_cast<double>(dsumPa)
+               << " (" << pos_chk_val << ") " << endl;
+          cout << setprecision(20) << "\tdsumN = " << static_cast<double>(dsumN)
+               << " (" << neg_chk_val << ") " << endl;
+          cout << setprecision(20) << "\tdsumP = " << static_cast<double>(dsumP)
+               << " (" << pos_chk_val << ") " << endl;
 
         } else {
           s_ntests_passed++;
         }
       }
-    } //end test4
+
+    } //end test 4
+
+    ////////////////////////////////////////////////////////////////////////////
+
+    //
+    // test 5 runs reductions on host and device simultaneously.
+    {  // begin test 5
+
+      s_ntests_run++;
+
+      double dtinit = 5.0;
+      int itinit = 4;
+
+      ReduceSum<cuda_reduce<block_size>, double> dsum0(dtinit * 1.0);
+      ReduceSum<cuda_reduce<block_size>, int> isum1(itinit * 2);
+      ReduceSum<cuda_reduce<block_size>, double> dsum2(dtinit * 3.0);
+      ReduceSum<cuda_reduce<block_size>, int> isum3(itinit * 4);
+
+      forall< cuda_exec_async<block_size> >(
+          0, TEST_VEC_LEN, [=] __device__(int i) {
+            dsum0 += dvalue[i];
+            isum1 += 2 * ivalue[i];
+            dsum2 += 3 * dvalue[i];
+            isum3 += 4 * ivalue[i];
+          });
+
+      forall< seq_exec >(
+          0, TEST_VEC_LEN, [=] __host__ __device__(int i) {
+            dsum0 += hdvalue[i];
+            isum1 += 2 * hivalue[i];
+            dsum2 += 3 * hdvalue[i];
+            isum3 += 4 * hivalue[i];
+          });
+
+      double dbase_chk_val = 2.0 * dinit_val * double(TEST_VEC_LEN);
+      int ibase_chk_val = 2 * iinit_val * TEST_VEC_LEN;
+
+      if (!equal(dsum0.get(), dbase_chk_val + (dtinit * 1.0))
+          || !equal(isum1.get(), 2 * ibase_chk_val + (itinit * 2))
+          || !equal(dsum2.get(), 3 * dbase_chk_val + (dtinit * 3.0))
+          || !equal(isum3.get(), 4 * ibase_chk_val + (itinit * 4))) {
+        cout << "\n TEST 5 FAILURE: tcount = " << tcount << endl;
+        cout << setprecision(20)
+             << "\tdsum0 = " << static_cast<double>(dsum0.get()) << " ("
+             << dbase_chk_val + (dtinit * 1.0) << ") " << endl;
+        cout << setprecision(20)
+             << "\tisum1 = " << static_cast<double>(isum1.get()) << " ("
+             << 2 * ibase_chk_val + (itinit * 2) << ") " << endl;
+        cout << setprecision(20)
+             << "\tdsum2 = " << static_cast<double>(dsum2.get()) << " ("
+             << 3 * dbase_chk_val + (dtinit * 3.0) << ") " << endl;
+        cout << setprecision(20)
+             << "\tisum3 = " << static_cast<double>(isum3.get()) << " ("
+             << 4 * ibase_chk_val + (itinit * 4) << ") " << endl;
+
+      } else {
+        s_ntests_passed++;
+      }
+
+      cudaDeviceSynchronize();
+
+    }  // end test 5
+
   }  // end test repeat loop
 
   ///

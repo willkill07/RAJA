@@ -49,6 +49,15 @@ int main(int argc, char *argv[])
     dvalue[i] = -DBL_MAX;
   }
 
+  //
+  // Allocate and initialize host data array
+  //
+  double *hvalue;
+  hvalue = (double*)malloc(sizeof(double) * TEST_VEC_LEN);
+  for (int i = 0; i < TEST_VEC_LEN; ++i) {
+    hvalue[i] = -DBL_MAX;
+  }
+
   ///
   /// Define thread block size for CUDA exec policy
   ///
@@ -68,6 +77,7 @@ int main(int argc, char *argv[])
   mt19937 mt(rd());
   uniform_real_distribution<double> dist(-10, 10);
   uniform_real_distribution<double> dist2(0, TEST_VEC_LEN - 1);
+  uniform_real_distribution<double> dist3(0, 2 * TEST_VEC_LEN - 1);
 
   for (int tcount = 0; tcount < test_repeat; ++tcount) {
     cout << "\t tcount = " << tcount << endl;
@@ -78,6 +88,12 @@ int main(int argc, char *argv[])
     //        reductions can be run with the same reduction objects.
     //        Also exercises the get function call
     {  // begin test 1
+
+      for (int i = 0; i < TEST_VEC_LEN; ++i) {
+        dvalue[i] = -DBL_MAX;
+      }
+      dcurrentMax.val = -DBL_MAX;
+      dcurrentMax.idx = -1;
 
       double BIG_MAX = 500.0;
       ReduceMaxLoc<cuda_reduce<block_size>, double> dmax0(-DBL_MAX, -1);
@@ -90,12 +106,13 @@ int main(int argc, char *argv[])
 
         double droll = dist(mt);
         int index = int(dist2(mt));
-        maxloc_t lmax = {droll, index};
-        dvalue[index] = droll;
-        dcurrentMax = RAJA_MAXLOC(dcurrentMax, lmax);
 
-        // printf("droll[%d] =  %lf : dcurrentMax[%d] =
-        // %lf\n",lmax.idx,lmax.val,dcurrentMax.idx,dcurrentMax.val);
+        if (droll > dvalue[index]) {
+          maxloc_t lmax = {droll, index};
+          dvalue[index] = droll;
+          dcurrentMax = RAJA_MAXLOC(dcurrentMax, lmax);
+        }
+
         forall<cuda_exec<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
           dmax0.maxloc(dvalue[i], i);
           dmax1.maxloc(2 * dvalue[i], i);
@@ -144,12 +161,13 @@ int main(int argc, char *argv[])
       ReduceMaxLoc<cuda_reduce<block_size>, double> dmax1(-DBL_MAX, -1);
 
       int index = int(dist2(mt));
-
       double droll = dist(mt);
-      dvalue[index] = droll;
-      maxloc_t lmax = {droll, index};
-      dvalue[index] = droll;
-      dcurrentMax = RAJA_MAXLOC(dcurrentMax, lmax);
+
+      if (droll > dvalue[index]) {
+        maxloc_t lmax = {droll, index};
+        dvalue[index] = droll;
+        dcurrentMax = RAJA_MAXLOC(dcurrentMax, lmax);
+      }
 
       forall<IndexSet::ExecPolicy<seq_segit, cuda_exec<block_size> > >(
           iset, [=] __device__(int i) {
@@ -190,6 +208,7 @@ int main(int argc, char *argv[])
       }
       dcurrentMax.val = -DBL_MAX;
       dcurrentMax.idx = -1;
+
       RangeSegment seg0(1, 1230);
       RangeSegment seg1(1237, 3385);
       RangeSegment seg2(4860, 10110);
@@ -211,11 +230,11 @@ int main(int argc, char *argv[])
       if (tcount % 4 == 0) index = 29457;  // seg 3
 
       double droll = dist(mt);
-      dvalue[index] = droll;
-
-      maxloc_t lmax = {droll, index};
-      dvalue[index] = droll;
-      dcurrentMax = RAJA_MAXLOC(dcurrentMax, lmax);
+      if (droll > dvalue[index]) {
+        maxloc_t lmax = {droll, index};
+        dvalue[index] = droll;
+        dcurrentMax = RAJA_MAXLOC(dcurrentMax, lmax);
+      }
 
       forall<IndexSet::ExecPolicy<seq_segit, cuda_exec<block_size> > >(
           iset, [=] __device__(int i) {
@@ -238,6 +257,79 @@ int main(int argc, char *argv[])
       }
 
     }  // end test 3
+
+    ////////////////////////////////////////////////////////////////////////////
+
+    //
+    // test 4 runs reductions on host and device simultaneously.
+    //
+    {  // begin test 4
+
+      for (int i = 0; i < TEST_VEC_LEN; ++i) {
+        dvalue[i] = -DBL_MAX;
+        hvalue[i] = -DBL_MAX;
+      }
+      dcurrentMax.val = -DBL_MAX;
+      dcurrentMax.idx = -1;
+
+      double BIG_MAX = 500.0;
+      ReduceMaxLoc<cuda_reduce<block_size>, double> dmax0(-DBL_MAX, -1);
+      ReduceMaxLoc<cuda_reduce<block_size>, double> dmax1(-DBL_MAX, -1);
+      ReduceMaxLoc<cuda_reduce<block_size>, double> dmax2(BIG_MAX, -1);
+
+      int loops = 16;
+      for (int k = 0; k < loops; k++) {
+        s_ntests_run++;
+
+        double droll = dist(mt);
+        int index = int(dist3(mt));
+
+        if (index < TEST_VEC_LEN) {
+          maxloc_t lmax = {droll, index};
+          if (droll > dvalue[index]) {
+            dvalue[index] = droll;
+            dcurrentMax = RAJA_MAXLOC(dcurrentMax, lmax);
+          }
+        } else {
+          maxloc_t lmax = {droll, index - TEST_VEC_LEN};
+          if (droll > hvalue[index - TEST_VEC_LEN]) {
+            hvalue[index - TEST_VEC_LEN] = droll;
+            dcurrentMax = RAJA_MAXLOC(dcurrentMax, lmax);
+          }
+        }
+
+        forall< cuda_exec_async<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
+          dmax0.maxloc(dvalue[i], i);
+          dmax1.maxloc(2 * dvalue[i], i);
+          dmax2.maxloc(dvalue[i], i);
+        });
+
+        forall< seq_exec >(0, TEST_VEC_LEN, [=] __host__ __device__(int i) {
+          dmax0.maxloc(hvalue[i], i);
+          dmax1.maxloc(2 * hvalue[i], i);
+          dmax2.maxloc(hvalue[i], i);
+        });
+
+        if (dmax0.get() != dcurrentMax.val || dmax1.get() != 2 * dcurrentMax.val
+            || dmax2.get() != BIG_MAX
+            || dmax0.getLoc() != dcurrentMax.idx
+            || dmax1.getLoc() != dcurrentMax.idx) {
+          cout << "\n TEST 4 FAILURE: tcount, k = " << tcount << " , " << k
+               << endl;
+          cout << "  droll = " << droll << endl;
+          cout << "\tdmax0 = " << static_cast<double>(dmax0.get()) << " ("
+               << dcurrentMax.val << ") " << endl;
+          cout << "\tdmax1 = " << static_cast<double>(dmax1.get()) << " ("
+               << 2 * dcurrentMax.val << ") " << endl;
+          cout << "\tdmax2 = " << static_cast<double>(dmax2.get()) << " ("
+               << BIG_MAX << ") " << endl;
+        } else {
+          s_ntests_passed++;
+        }
+        cudaDeviceSynchronize();
+      }
+
+    }  // end test 4
 
   }  // end test repeat loop
 

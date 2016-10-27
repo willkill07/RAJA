@@ -50,6 +50,15 @@ int main(int argc, char *argv[])
     dvalue[i] = DBL_MAX;
   }
 
+  //
+  // Allocate and initialize host data array
+  //
+  double *hvalue;
+  hvalue = (double*)malloc(sizeof(double) * TEST_VEC_LEN);
+  for (int i = 0; i < TEST_VEC_LEN; ++i) {
+    hvalue[i] = DBL_MAX;
+  }
+
   ///
   /// Define thread block size for CUDA exec policy
   ///
@@ -70,6 +79,7 @@ int main(int argc, char *argv[])
   mt19937 mt(rd());
   uniform_real_distribution<double> dist(-10, 10);
   uniform_real_distribution<double> dist2(0, TEST_VEC_LEN - 1);
+  uniform_real_distribution<double> dist3(0, 2 * TEST_VEC_LEN - 1);
 
   for (int tcount = 0; tcount < test_repeat; ++tcount) {
     cout << "\t tcount = " << tcount << endl;
@@ -81,9 +91,15 @@ int main(int argc, char *argv[])
     //        Also exercises the get function call
     {  // begin test 1
 
+      for (int i = 0; i < TEST_VEC_LEN; ++i) {
+        dvalue[i] = DBL_MAX;
+      }
+      dcurrentMin.val = DBL_MAX;
+      dcurrentMin.idx = -1;
+
       double BIG_MIN = -500.0;
       ReduceMinLoc<cuda_reduce<block_size>, double> dmin0(DBL_MAX, -1);
-      ReduceMinLoc<cuda_reduce<block_size>, double> dmin1(DBL_MAX, 1);
+      ReduceMinLoc<cuda_reduce<block_size>, double> dmin1(DBL_MAX, -1);
       ReduceMinLoc<cuda_reduce<block_size>, double> dmin2(BIG_MIN, -1);
 
       int loops = 16;
@@ -92,13 +108,12 @@ int main(int argc, char *argv[])
 
         double droll = dist(mt);
         int index = int(dist2(mt));
-        dvalue[index] = droll;
+        if (droll < dvalue[index]) {
+          minloc_t lmin = {droll, index};
+          dvalue[index] = droll;
+          dcurrentMin = RAJA_MINLOC(dcurrentMin, lmin);
+        }
 
-        minloc_t lmin = {droll, index};
-        dvalue[index] = droll;
-        dcurrentMin = RAJA_MINLOC(dcurrentMin, lmin);
-        // printf("droll %lf : dcurrentMin %lf : index
-        // %d\n",droll,dcurrentMin,index);
         forall<cuda_exec<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
           dmin0.minloc(dvalue[i], i);
           dmin1.minloc(2 * dvalue[i], i);
@@ -146,13 +161,13 @@ int main(int argc, char *argv[])
       ReduceMinLoc<cuda_reduce<block_size>, double> dmin1(DBL_MAX, -1);
 
       int index = int(dist2(mt));
-
       double droll = dist(mt);
-      dvalue[index] = droll;
 
-      minloc_t lmin = {droll, index};
-      dvalue[index] = droll;
-      dcurrentMin = RAJA_MINLOC(dcurrentMin, lmin);
+      if (droll < dvalue[index]) {
+        minloc_t lmin = {droll, index};
+        dvalue[index] = droll;
+        dcurrentMin = RAJA_MINLOC(dcurrentMin, lmin);
+      }
 
       forall<IndexSet::ExecPolicy<seq_segit, cuda_exec<block_size> > >(
           iset, [=] __device__(int i) {
@@ -216,11 +231,11 @@ int main(int argc, char *argv[])
       if (tcount % 4 == 0) index = 29457;  // seg 3
 
       double droll = dist(mt);
-      dvalue[index] = droll;
-
-      minloc_t lmin = {droll, index};
-      dvalue[index] = droll;
-      dcurrentMin = RAJA_MINLOC(dcurrentMin, lmin);
+      if (droll < dvalue[index]) {
+        minloc_t lmin = {droll, index};
+        dvalue[index] = droll;
+        dcurrentMin = RAJA_MINLOC(dcurrentMin, lmin);
+      }
 
       forall<IndexSet::ExecPolicy<seq_segit, cuda_exec<block_size> > >(
           iset, [=] __device__(int i) {
@@ -243,6 +258,80 @@ int main(int argc, char *argv[])
       }
 
     }  // end test 3
+
+    ////////////////////////////////////////////////////////////////////////////
+
+    //
+    // test 4 runs reductions on host and device simultaneously.
+    //
+    {  // begin test 4
+
+      for (int i = 0; i < TEST_VEC_LEN; ++i) {
+        dvalue[i] = DBL_MAX;
+        hvalue[i] = DBL_MAX;
+      }
+      dcurrentMin.val = DBL_MAX;
+      dcurrentMin.idx = -1;
+
+      double BIG_MIN = -500.0;
+      ReduceMinLoc<cuda_reduce<block_size>, double> dmin0(DBL_MAX, -1);
+      ReduceMinLoc<cuda_reduce<block_size>, double> dmin1(DBL_MAX, -1);
+      ReduceMinLoc<cuda_reduce<block_size>, double> dmin2(BIG_MIN, -1);
+
+      int loops = 16;
+      for (int k = 0; k < loops; k++) {
+        s_ntests_run++;
+
+        double droll = dist(mt);
+        int index = int(dist3(mt));
+
+        if (index < TEST_VEC_LEN) {
+          minloc_t lmin = {droll, index};
+          if (droll < dvalue[index]) {
+            dvalue[index] = droll;
+            dcurrentMin = RAJA_MINLOC(dcurrentMin, lmin);
+          }
+        } else {
+          minloc_t lmin = {droll, index - TEST_VEC_LEN};
+          if (droll < hvalue[index - TEST_VEC_LEN]) {
+            hvalue[index - TEST_VEC_LEN] = droll;
+            dcurrentMin = RAJA_MINLOC(dcurrentMin, lmin);
+          }
+        }
+
+        forall< cuda_exec_async<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
+          dmin0.minloc(dvalue[i], i);
+          dmin1.minloc(2 * dvalue[i], i);
+          dmin2.minloc(dvalue[i], i);
+        });
+
+        forall< seq_exec >(0, TEST_VEC_LEN, [=] __host__ __device__(int i) {
+          dmin0.minloc(hvalue[i], i);
+          dmin1.minloc(2 * hvalue[i], i);
+          dmin2.minloc(hvalue[i], i);
+        });
+
+        if (dmin0.get() != dcurrentMin.val || dmin1.get() != 2 * dcurrentMin.val
+            || dmin2.get() != BIG_MIN
+            || dmin0.getLoc() != dcurrentMin.idx
+            || dmin1.getLoc() != dcurrentMin.idx) {
+          cout << "\n TEST 4 FAILURE: tcount, k = " << tcount << " , " << k
+               << endl;
+          cout << "  droll = " << droll << endl;
+          cout << "\tdmin0 = " << static_cast<double>(dmin0.get()) << " ("
+               << dcurrentMin.val << ") " << endl;
+          cout << "\tdmin1 = " << static_cast<double>(dmin1.get()) << " ("
+               << 2 * dcurrentMin.val << ") " << endl;
+          cout << "\tdmin2 = " << static_cast<double>(dmin2.get()) << " ("
+               << BIG_MIN << ") " << endl;
+        } else {
+          s_ntests_passed++;
+        }
+        cudaDeviceSynchronize();
+      }
+
+    }  // end test 4
+
   }    // end test repeat loop
 
   ///
