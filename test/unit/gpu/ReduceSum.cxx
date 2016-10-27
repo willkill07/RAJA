@@ -20,7 +20,7 @@
 
 #include "Compare.hxx"
 
-#define TEST_VEC_LEN 1024 * 1024
+#define TEST_VEC_LEN (1024 * 1024)
 
 using namespace RAJA;
 using namespace std;
@@ -410,6 +410,57 @@ int main(int argc, char *argv[])
 
     }  // end test 5
 
+    ////////////////////////////////////////////////////////////////////////////
+
+    //
+    // test 6 runs reductions on the host only.
+    {  // begin test 6
+
+      s_ntests_run++;
+
+      double dtinit = 5.0;
+      int itinit = 4;
+
+      ReduceSum<cuda_reduce<block_size>, double> dsum0(dtinit * 1.0);
+      ReduceSum<cuda_reduce<block_size>, int> isum1(itinit * 2);
+      ReduceSum<cuda_reduce<block_size>, double> dsum2(dtinit * 3.0);
+      ReduceSum<cuda_reduce<block_size>, int> isum3(itinit * 4);
+
+      forall< seq_exec >(
+          0, TEST_VEC_LEN, [=] __host__ __device__(int i) {
+            dsum0 += hdvalue[i];
+            isum1 += 2 * hivalue[i];
+            dsum2 += 3 * hdvalue[i];
+            isum3 += 4 * hivalue[i];
+          });
+
+      double dbase_chk_val = dinit_val * double(TEST_VEC_LEN);
+      int ibase_chk_val = iinit_val * TEST_VEC_LEN;
+
+      if (!equal(dsum0.get(), dbase_chk_val + (dtinit * 1.0))
+          || !equal(isum1.get(), 2 * ibase_chk_val + (itinit * 2))
+          || !equal(dsum2.get(), 3 * dbase_chk_val + (dtinit * 3.0))
+          || !equal(isum3.get(), 4 * ibase_chk_val + (itinit * 4))) {
+        cout << "\n TEST 6 FAILURE: tcount = " << tcount << endl;
+        cout << setprecision(20)
+             << "\tdsum0 = " << static_cast<double>(dsum0.get()) << " ("
+             << dbase_chk_val + (dtinit * 1.0) << ") " << endl;
+        cout << setprecision(20)
+             << "\tisum1 = " << static_cast<double>(isum1.get()) << " ("
+             << 2 * ibase_chk_val + (itinit * 2) << ") " << endl;
+        cout << setprecision(20)
+             << "\tdsum2 = " << static_cast<double>(dsum2.get()) << " ("
+             << 3 * dbase_chk_val + (dtinit * 3.0) << ") " << endl;
+        cout << setprecision(20)
+             << "\tisum3 = " << static_cast<double>(isum3.get()) << " ("
+             << 4 * ibase_chk_val + (itinit * 4) << ") " << endl;
+
+      } else {
+        s_ntests_passed++;
+      }
+
+    }  // end test 6
+
   }  // end test repeat loop
 
   ///
@@ -420,6 +471,9 @@ int main(int argc, char *argv[])
 
   cudaFree(dvalue);
   cudaFree(ivalue);
+
+  free(hdvalue);
+  free(hivalue);
 
   return !(s_ntests_passed == s_ntests_run);
 }

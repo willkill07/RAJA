@@ -305,7 +305,59 @@ int main(int argc, char *argv[])
         cudaDeviceSynchronize();
       }
 
-    }  // end test 4
+    }  // end test 5
+
+    ////////////////////////////////////////////////////////////////////////////
+
+    //
+    // test 5 runs reductions on host and device simultaneously.
+    //
+    {  // begin test 5
+
+      for (int i = 0; i < TEST_VEC_LEN; ++i) {
+        hvalue[i] = DBL_MAX;
+      }
+      dcurrentMin = DBL_MAX;
+
+      double BIG_MIN = -500.0;
+      ReduceMin<cuda_reduce<block_size>, double> dmin0(DBL_MAX);
+      ReduceMin<cuda_reduce<block_size>, double> dmin1(DBL_MAX);
+      ReduceMin<cuda_reduce<block_size>, double> dmin2(BIG_MIN);
+
+      int loops = 16;
+      for (int k = 0; k < loops; k++) {
+        s_ntests_run++;
+
+        double droll = dist(mt);
+        int index = int(dist2(mt));
+        if (droll < hvalue[index]) {
+          hvalue[index] = droll;
+          dcurrentMin = RAJA_MIN(dcurrentMin, hvalue[index]);
+        }
+
+        forall< seq_exec >(0, TEST_VEC_LEN, [=] __host__ __device__(int i) {
+          dmin0.min(hvalue[i]);
+          dmin1.min(2 * hvalue[i]);
+          dmin2.min(hvalue[i]);
+        });
+
+        if (dmin0.get() != dcurrentMin || dmin1.get() != 2 * dcurrentMin
+            || dmin2.get() != BIG_MIN) {
+          cout << "\n TEST 5 FAILURE: tcount, k = " << tcount << " , " << k
+               << endl;
+          cout << "  droll = " << droll << endl;
+          cout << "\tdmin0 = " << static_cast<double>(dmin0.get()) << " ("
+               << dcurrentMin << ") " << endl;
+          cout << "\tdmin1 = " << static_cast<double>(dmin1.get()) << " ("
+               << 2 * dcurrentMin << ") " << endl;
+          cout << "\tdmin2 = " << static_cast<double>(dmin2.get()) << " ("
+               << BIG_MIN << ") " << endl;
+        } else {
+          s_ntests_passed++;
+        }
+      }
+
+    }  // end test 5
 
   }  // end test repeat loop
 
@@ -316,6 +368,8 @@ int main(int argc, char *argv[])
        << s_ntests_run << endl;
 
   cudaFree(dvalue);
+
+  free(hvalue);
 
   cout << "\n RAJA GPU ReduceMin tests DONE!!! " << endl;
 

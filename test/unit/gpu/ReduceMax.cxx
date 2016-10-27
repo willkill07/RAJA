@@ -306,6 +306,58 @@ int main(int argc, char *argv[])
 
     }  // end test 4
 
+    ////////////////////////////////////////////////////////////////////////////
+
+    //
+    // test 5 runs reductions on the host only.
+    //
+    {  // begin test 5
+
+      for (int i = 0; i < TEST_VEC_LEN; ++i) {
+        hvalue[i] = -DBL_MAX;
+      }
+      dcurrentMax = -DBL_MAX;
+
+      double BIG_MAX = 500.0;
+      ReduceMax<cuda_reduce<block_size>, double> dmax0(-DBL_MAX);
+      ReduceMax<cuda_reduce<block_size>, double> dmax1(-DBL_MAX);
+      ReduceMax<cuda_reduce<block_size>, double> dmax2(BIG_MAX);
+
+      int loops = 16;
+      for (int k = 0; k < loops; k++) {
+        s_ntests_run++;
+
+        double droll = dist(mt);
+        int index = int(dist2(mt));
+        if (droll > hvalue[index]) {
+          hvalue[index] = droll;
+          dcurrentMax = RAJA_MAX(dcurrentMax, hvalue[index]);
+        }
+
+        forall< seq_exec >(0, TEST_VEC_LEN, [=] __host__ __device__(int i) {
+          dmax0.max(hvalue[i]);
+          dmax1.max(2 * hvalue[i]);
+          dmax2.max(hvalue[i]);
+        });
+
+        if (dmax0.get() != dcurrentMax || dmax1.get() != 2 * dcurrentMax
+            || dmax2.get() != BIG_MAX) {
+          cout << "\n TEST 5 FAILURE: tcount, k = " << tcount << " , " << k
+               << endl;
+          cout << "  droll = " << droll << endl;
+          cout << "\tdmax0 = " << static_cast<double>(dmax0.get()) << " ("
+               << dcurrentMax << ") " << endl;
+          cout << "\tdmax1 = " << static_cast<double>(dmax1.get()) << " ("
+               << 2 * dcurrentMax << ") " << endl;
+          cout << "\tdmax2 = " << static_cast<double>(dmax2.get()) << " ("
+               << BIG_MAX << ") " << endl;
+        } else {
+          s_ntests_passed++;
+        }
+      }
+
+    }  // end test 5
+
   }  // end test repeat loop
 
   ///
@@ -315,6 +367,8 @@ int main(int argc, char *argv[])
        << s_ntests_run << endl;
 
   cudaFree(dvalue);
+
+  free(hvalue);
 
   cout << "\n RAJA GPU ReduceMax tests DONE!!! " << endl;
 

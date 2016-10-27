@@ -331,6 +331,63 @@ int main(int argc, char *argv[])
 
     }  // end test 4
 
+    ////////////////////////////////////////////////////////////////////////////
+
+    //
+    // test 5 runs reductions on the host only.
+    //
+    {  // begin test 5
+
+      for (int i = 0; i < TEST_VEC_LEN; ++i) {
+        hvalue[i] = -DBL_MAX;
+      }
+      dcurrentMax.val = -DBL_MAX;
+      dcurrentMax.idx = -1;
+
+      double BIG_MAX = 500.0;
+      ReduceMaxLoc<cuda_reduce<block_size>, double> dmax0(-DBL_MAX, -1);
+      ReduceMaxLoc<cuda_reduce<block_size>, double> dmax1(-DBL_MAX, -1);
+      ReduceMaxLoc<cuda_reduce<block_size>, double> dmax2(BIG_MAX, -1);
+
+      int loops = 16;
+      for (int k = 0; k < loops; k++) {
+        s_ntests_run++;
+
+        double droll = dist(mt);
+        int index = int(dist2(mt));
+
+        maxloc_t lmax = {droll, index};
+        if (droll > hvalue[index]) {
+          hvalue[index] = droll;
+          dcurrentMax = RAJA_MAXLOC(dcurrentMax, lmax);
+        }
+
+        forall< seq_exec >(0, TEST_VEC_LEN, [=] __host__ __device__(int i) {
+          dmax0.maxloc(hvalue[i], i);
+          dmax1.maxloc(2 * hvalue[i], i);
+          dmax2.maxloc(hvalue[i], i);
+        });
+
+        if (dmax0.get() != dcurrentMax.val || dmax1.get() != 2 * dcurrentMax.val
+            || dmax2.get() != BIG_MAX
+            || dmax0.getLoc() != dcurrentMax.idx
+            || dmax1.getLoc() != dcurrentMax.idx) {
+          cout << "\n TEST 5 FAILURE: tcount, k = " << tcount << " , " << k
+               << endl;
+          cout << "  droll = " << droll << endl;
+          cout << "\tdmax0 = " << static_cast<double>(dmax0.get()) << " ("
+               << dcurrentMax.val << ") " << endl;
+          cout << "\tdmax1 = " << static_cast<double>(dmax1.get()) << " ("
+               << 2 * dcurrentMax.val << ") " << endl;
+          cout << "\tdmax2 = " << static_cast<double>(dmax2.get()) << " ("
+               << BIG_MAX << ") " << endl;
+        } else {
+          s_ntests_passed++;
+        }
+      }
+
+    }  // end test 5
+
   }  // end test repeat loop
 
   ///
@@ -340,6 +397,8 @@ int main(int argc, char *argv[])
        << s_ntests_run << endl;
 
   cudaFree(dvalue);
+
+  free(hvalue);
 
   cout << "\n RAJA GPU ReduceMaxLoc tests DONE!!! " << endl;
 
