@@ -12,10 +12,6 @@
 RAJA Coding Guidelines
 *********************************
 
-======================================================
-0 Intent of the Guidelines
-======================================================
-
 These guidelines define code style conventions for RAJA. Most of the 
 guidelines were taken from the cited references, sometimes with 
 modifications and simplifications; see :ref:`codingrefs-label`.
@@ -43,9 +39,9 @@ on the particular code situation. It is best to use them in a manner that
 enhances code readability and help to reduce user and developer errors.
 
 
-=========================================================
-1 General Considerations
-=========================================================
+==============================================================
+1 Modifying Existing Code and Deviating from These Guidelines
+==============================================================
 
 1.1 When modifying existing code, the style conventions already in
 use in the file **must** be followed. This is not intended to
@@ -61,6 +57,8 @@ multiple conflicting styles.
 agreed upon by the development team. If the guidelines need to be changed,
 they **should** be.
 
+
+.. _namesec-label:
 
 ========
 2 Names
@@ -161,7 +159,7 @@ relationship is clear.
 
 
 ------------------------
-2.4 Scopes and types
+2.4 Types
 ------------------------
 
 2.4.1 Type names (i.e., classes, structs, typedefs, enums, etc.) **must** be 
@@ -341,6 +339,8 @@ and use an underscore between words when multiple words are used.
           };
 
 
+.. _dirorgsec-label:
+
 =====================================
 3 Directory and File Organization
 =====================================
@@ -370,6 +370,8 @@ there is a good reason to do otherwise.
 3.2.2 Each file **must** reside in the directory that corresponds to the code 
 functionality supported by the contents of the file.
 
+
+.. _headerguide-label:
 
 ---------------------------------------------------------
 3.3 General header file guidelines
@@ -603,6 +605,8 @@ prologue **must** appear before the class definition; see Section 4
 for details.
 
 
+.. _sourceguide-label:
+
 ---------------------------------------------------------
 3.5 General source file guidelines
 ---------------------------------------------------------
@@ -697,6 +701,8 @@ inclusion pattern as its corresponding header file (see item 3.4.6).
       initialized explicitly in the class source file before any method
       implementations (item 6).
 
+
+.. _scopesec-label:
 
 =====================================
 4 Scope
@@ -861,6 +867,8 @@ enclosing class interface.
       This makes it clear that the nested class is only needed in the
       implementation and does not clutter the class definition.
 
+
+.. _docsec-label: 
 
 ========================================
 5 Code Documentation
@@ -1392,9 +1400,11 @@ with a single descriptive comment.
          //@}
 
 
-========================================
-6 Design for Correctness and Robustness
-========================================
+.. _designsec-label:
+
+=======================================================
+6 Design and Implement for Correctness and Robustness
+=======================================================
 
 The guidelines in this section describe sound software engineering
 practices that help enforce correctness and robustness and help
@@ -2063,6 +2073,8 @@ expressions to clearly indicate structure and intended order of operations.
       Do not assume everyone who looks at the code knows all the rules for 
       operator precedence.
 
+
+.. _portsec-label: 
 
 ===================================================
 8 Portability, Compilation, and Dependencies
