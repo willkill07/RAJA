@@ -173,6 +173,33 @@ const int RAJA_CUDA_MAX_BLOCK_SIZE = 2048;
   gridSize, blockSize, getCudaSharedmemAmount(gridSize, blockSize)
 
 //
+/////////////////////////////////////////////////////////////////////////////
+//
+// Variables representing the state of cuda stream usage.
+//
+/////////////////////////////////////////////////////////////////////////////
+//
+
+namespace Internal {
+  extern cudaStream_t currentStream;
+  extern std::unordered_map<cudaStream_t, cudaEvent_t> s_stream_events;
+  extern bool s_streams_initialized;
+}
+
+extern void register_streams(cudaStream_t const* streams, size_t num_streams);
+extern void use_stream(cudaStream_t stream);
+extern cudaStream_t getStream();
+extern cudaEvent_t getEvent(cuda_stream_t stream);
+  
+//
+/////////////////////////////////////////////////////////////////////////////
+//
+// Implementations of cuda atomics.
+//
+/////////////////////////////////////////////////////////////////////////////
+//
+
+//
 // Three different variants of min/max reductions can be run by choosing
 // one of these macros. Only one should be defined!!!
 //
