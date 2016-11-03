@@ -64,6 +64,13 @@
 #include "RAJA/int_datatypes.hxx"
 #include "RAJA/fault_tolerance.hxx"
 #include "RAJA/internal/defines.hxx"
+#include "RAJA/forall_generic.hxx"
+#include "RAJA/exec-sequential/raja_sequential.hxx"
+#include "RAJA/exec-sequential/forall_sequential.hxx"
+#if defined(RAJA_ENABLE_OPENMP)
+#include "RAJA/exec-sequential/raja_sequential.hxx"
+#include "RAJA/exec-sequential/forall_sequential.hxx"
+#endif
 #include "RAJA/exec-cuda/raja_cuda.hxx"
 #include "RAJA/exec-cuda/raja_cudaerrchk.hxx"
 #include "RAJA/exec-cuda/MemUtils_CUDA.hxx"
