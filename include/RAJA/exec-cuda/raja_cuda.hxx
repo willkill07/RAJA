@@ -186,8 +186,8 @@ namespace Internal {
   extern bool s_streams_initialized;
 }
 
-extern void register_streams(cudaStream_t const* streams, size_t num_streams);
-extern void use_stream(cudaStream_t stream);
+extern void registerStreams(cudaStream_t const* streams, size_t num_streams);
+extern void useStream(cudaStream_t stream);
 extern cudaStream_t getStream();
 extern cudaEvent_t getEvent(cuda_stream_t stream);
   
