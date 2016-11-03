@@ -287,20 +287,37 @@ RAJA_INLINE void forall_Icount(
 }
 
   
-  
-template <typename EXEC_TYPE, bool Async, typename Iterable, typename LOOP_BODY>
-RAJA_INLINE void forall(cuda_stream_exec<EXEC_TYPE, Async>,
-                        Iterable&& iter,
+/*!
+ ******************************************************************************
+ *
+ * \brief  Generic iteration over indices in indirection array.
+ *
+ ******************************************************************************
+ */
+template <typename EXEC_POLICY_T, typename LOOP_BODY>
+RAJA_INLINE void forall(cudaStream_t const* streams,
+                        Index_type len,
                         LOOP_BODY&& loop_body)
 {
-  registerStreams(iter);
+  forall(EXEC_POLICY_T(), streams, len, std::forward<LOOP_BODY>(loop_body));
+}
+
+template <typename EXEC_TYPE, bool Async, typename Iterable, typename LOOP_BODY>
+RAJA_INLINE void forall(cuda_stream_exec<EXEC_TYPE, Async>,
+                        cudaStream_t const* streams,
+                        Index_type len,
+                        LOOP_BODY&& loop_body)
+{
+  registerStreams(streams, len);
   
   cudaStream_t prev_stream = getStream();
   cudaEvent_t prev_event = getEvent(prev_stream);
+  
   cudaErrchk(cudaEventRecord(prev_event, prev_stream));
 
-  forall(EXEC_TYPE(), std::forward<Iterable>(iter), [=](cudaStream_t stream)
+  forall<EXEC_TYPE>(0, len, [=](Index_type i)
   {
+    cudaStream_t stream = streams[i];
     cudaErrchk(cudaStreamWaitEvent(stream, prev_event, 0));
     
     useStream(stream);
