@@ -170,8 +170,9 @@ using cuda_reduce_atomic_async = cuda_reduce_atomic<BLOCK_SIZE, true>;
 
 void registerStreams(cudaStream_t const* streams, size_t num_streams);
 void useStream(cudaStream_t stream);
-cudaEvent_t getEvent(cuda_stream_t stream);
-  
+cudaEvent_t getEvent(cudastream_t stream);
+
+
 //
 // Operations in the included files are parametrized using the following
 // values for CUDA warp size and max block size.
