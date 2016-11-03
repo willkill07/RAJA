@@ -180,12 +180,6 @@ const int RAJA_CUDA_MAX_BLOCK_SIZE = 2048;
 /////////////////////////////////////////////////////////////////////////////
 //
 
-namespace Internal {
-  extern cudaStream_t currentStream;
-  extern std::unordered_map<cudaStream_t, cudaEvent_t> s_stream_events;
-  extern bool s_streams_initialized;
-}
-
 extern void registerStreams(cudaStream_t const* streams, size_t num_streams);
 extern void useStream(cudaStream_t stream);
 extern cudaStream_t getStream();
