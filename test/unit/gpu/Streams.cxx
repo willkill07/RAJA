@@ -90,10 +90,8 @@ int main(int argc, char *argv[])
 
       double dtinit = 5.0;
 
-      for (int s = 0; s < NUM_STREAMS; s++) {
+      forall< cuda_streams_exec< seq_exec > >(streams, NUM_STREAMS, [=] (int s) {
         s_ntests_run++;
-
-        RAJA::setStream(streams[s]);
 
         ReduceSum<cuda_reduce<block_size>, double> dsum(dtinit);
 
@@ -116,9 +114,7 @@ int main(int argc, char *argv[])
         } else {
           s_ntests_passed++;
         }
-
-        RAJA::setStream(0);
-      }
+      } );
 
     }  // end test 1
 
@@ -127,25 +123,21 @@ int main(int argc, char *argv[])
     //
     // test 2 run a kernel with 1 reduction value in each stream synchronously.
     //
-    {  // begin test 1
+    {  // begin test 2
+      s_ntests_run++;
 
       double dtinit = 5.0;
 
       ReduceSum<cuda_reduce<block_size>, double> dsum(dtinit);
 
-      for (int s = 0; s < NUM_STREAMS; s++) {
-        s_ntests_run++;
-
-        RAJA::setStream(streams[s]);
+      forall< cuda_streams_exec< seq_exec > >(streams, NUM_STREAMS, [=] (int s) {
 
         double* dvalue = dvalues[s];
 
         forall<cuda_exec<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
           dsum += dvalue[i];
         });
-
-        RAJA::setStream(0);
-      }
+      } );
 
       double base_chk_val = dinit_val * double(TEST_VEC_LEN * NUM_STREAMS);
 
@@ -159,7 +151,62 @@ int main(int argc, char *argv[])
         s_ntests_passed++;
       }
 
-    }  // end test 1
+    }  // end test 2
+
+    ////////////////////////////////////////////////////////////////////////////
+
+    //
+    // test 3 run kernels with 1 reduction value on data used and changed in 
+    // different streams in each forall<streams> to test a possible race
+    // condition between streams.
+    //
+    {  // begin test 3
+
+      s_ntests_run++;
+
+      double dtinit = 5.0;
+
+      ReduceSum<cuda_reduce<block_size>, double> dsum(dtinit);
+
+      forall< cuda_streams_exec_async< seq_exec > >(streams, NUM_STREAMS, [=] (int s) {
+
+        double* dvalue = dvalues[s];
+
+        forall<cuda_exec<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
+          dsum += dvalue[i];
+        });
+
+        forall<cuda_exec<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
+          dvalue[i] = -dinit_val;
+        });
+      } );
+
+      forall< cuda_streams_exec< seq_exec > >(streams, NUM_STREAMS, [=] (int s) {
+
+        double* dvalue = dvalues[NUM_STREAMS - 1 - s];
+
+        forall<cuda_exec<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
+          dsum += dvalue[i];
+        });
+
+        forall<cuda_exec<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
+          dvalue[i] = dinit_val;
+        });
+      } );
+
+      double base_chk_val = 0.0;
+
+      if (!equal(double(dsum), dtinit + base_chk_val)) {
+        cout << "\n TEST 3 FAILURE: tcount, k = " << tcount << " , " << k
+             << endl;
+        cout << setprecision(20) << "\tdsum = " << static_cast<double>(dsum)
+             << " (" << dtinit + base_chk_val << ") " << endl;
+
+      } else {
+        s_ntests_passed++;
+      }
+
+    }  // end test 3
 
     ////////////////////////////////////////////////////////////////////////////
 
