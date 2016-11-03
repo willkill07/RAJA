@@ -62,6 +62,8 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 
+#include "RAJA/exec-cuda/raja_cudaerrchk.hxx"
+
 namespace RAJA
 {
 
@@ -180,10 +182,9 @@ const int RAJA_CUDA_MAX_BLOCK_SIZE = 2048;
 /////////////////////////////////////////////////////////////////////////////
 //
 
-extern void registerStreams(cudaStream_t const* streams, size_t num_streams);
-extern void useStream(cudaStream_t stream);
-extern cudaStream_t getStream();
-extern cudaEvent_t getEvent(cuda_stream_t stream);
+void registerStreams(cudaStream_t const* streams, size_t num_streams);
+void useStream(cudaStream_t stream);
+cudaEvent_t getEvent(cuda_stream_t stream);
   
 //
 /////////////////////////////////////////////////////////////////////////////
