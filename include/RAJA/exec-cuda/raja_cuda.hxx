@@ -63,6 +63,7 @@
 #include <cuda_runtime.h>
 
 #include "RAJA/exec-cuda/raja_cudaerrchk.hxx"
+#include "reducers.hxx"
 
 namespace RAJA
 {
