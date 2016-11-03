@@ -645,45 +645,45 @@ int getCudaSharedmemAmount(dim3 launchGridDim, dim3 launchBlockDim)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
   
-namespace Internal {
+namespace {
   cudaStream_t currentStream = 0;
   std::unordered_map<cudaStream_t, cudaEvent_t> s_stream_events;
   bool s_streams_initialized = false;
 }
 
-void register_streams(cudaStream_t const* streams, size_t num_streams)
+void registerStreams(cudaStream_t const* streams, size_t num_streams)
 {
-  if (!Internal::s_streams_initialized) {
+  if (!s_streams_initialized) {
     cudaEvent_t event;
     cudaEventCreateWithFlags(&event, cudaEventDisableTiming);
-    Internal::s_stream_events.insert({Internal::currentStream, event});
-    Internal::s_streams_initialized = true;
+    s_stream_events.insert({currentStream, event});
+    s_streams_initialized = true;
   }
   for (size_t s = 0; s < num_streams; ++s) {
-    auto search = Internal::s_stream_events.find(streams[s]);
-    if(search == Internal::s_stream_events.end()) {
+    auto search = s_stream_events.find(streams[s]);
+    if(search == s_stream_events.end()) {
         cudaEvent_t event;
         cudaEventCreateWithFlags(&event, cudaEventDisableTiming);
-        Internal::s_stream_events.insert({streams[s], event});
+        s_stream_events.insert({streams[s], event});
     }
   }
 }
 
 void useStream(cudaStream_t stream)
 {
-  assert(Internal::s_stream_events.find(stream) != Internal::s_stream_events.end());
-  Internal::currentStream = stream;
+  assert(s_stream_events.find(stream) != s_stream_events.end());
+  currentStream = stream;
 }
 
 void cudaStream_t getStream()
 {
-  return Internal::currentStream;
+  return currentStream;
 }
 
 void cudaEvent_t getEvent(cuda_stream_t stream)
 {
-  auto s = Internal::s_stream_events.find(stream);
-  assert(s != Internal::s_stream_events.end());
+  auto s = s_stream_events.find(stream);
+  assert(s != s_stream_events.end());
   return s->second;
 }
 
