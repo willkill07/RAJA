@@ -286,6 +286,38 @@ RAJA_INLINE void forall_Icount(
   RAJA_CUDA_CHECK_AND_SYNC(Async);
 }
 
+  
+  
+template <typename EXEC_TYPE, bool Async, typename Iterable, typename LOOP_BODY>
+RAJA_INLINE void forall(cuda_stream_exec<EXEC_TYPE, Async>,
+                        Iterable&& iter,
+                        LOOP_BODY&& loop_body)
+{
+  registerStreams(iter);
+  
+  cudaStream_t prev_stream = getStream();
+  cudaEvent_t prev_event = getEvent(prev_stream);
+  cudaErrchk(cudaEventRecord(prev_event, prev_stream));
+
+  forall(EXEC_TYPE(), std::forward<Iterable>(iter), [=](cudaStream_t stream)
+  {
+    cudaErrchk(cudaStreamWaitEvent(stream, prev_event, 0));
+    
+    useStream(stream);
+    
+    loop_body(stream);
+    
+    cudaEvent_t event = getEvent(stream);
+    cudaErrchk(cudaEventRecord(event, stream));
+    
+    cudaErrchk(cudaStreamWaitEvent(prev_stream, event, 0));
+  });
+  
+  useStream(prev_stream);
+
+  RAJA_CUDA_CHECK_AND_SYNC(Async);
+}
+
 }  // closing brace for RAJA namespace
 
 #endif  // closing endif for RAJA_ENABLE_CUDA guard
