@@ -58,6 +58,8 @@
 
 #include "RAJA/config.hxx"
 
+#include "RAJA/ListSegment.hxx"
+
 namespace RAJA
 {
 

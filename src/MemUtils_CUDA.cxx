@@ -69,6 +69,8 @@
 namespace RAJA
 {
 
+static void checkStream(cudaStream_t stream);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////
   
 namespace
@@ -81,6 +83,7 @@ namespace
 void registerStreams(cudaStream_t const* streams, size_t num_streams)
 {
   {
+    checkStream(getStream());
     auto s = s_stream_events.find(getStream());
     if(s == s_stream_events.end()) {
         cudaEvent_t event;
@@ -89,6 +92,7 @@ void registerStreams(cudaStream_t const* streams, size_t num_streams)
     }
   }
   for (size_t i = 0; i < num_streams; ++s) {
+    checkStream(streams[i]);
     auto s = s_stream_events.find(streams[i]);
     if(s == s_stream_events.end()) {
         cudaEvent_t event;
@@ -176,6 +180,25 @@ namespace
   std::unordered_map< cudaStream_t, cuda_stream_reducers_t > s_cuda_stream_reducers;
 }
 
+static void checkStream(cudaStream_t stream)
+{
+  auto s = s_cuda_stream_reducers.find(stream);
+
+  // check if never seen this stream before
+  if (s == s_cuda_stream_reducers.end()) {
+    
+    s = s_cuda_stream_reducers.insert({stream, cuda_stream_reducers_t()}).first;
+
+    s->second.reduction_id_used = new bool[RAJA_MAX_REDUCE_VARS];
+    
+    s->second.reduction_variables = new cuda_reduction_variable_t[RAJA_MAX_REDUCE_VARS];
+
+    for (int i = 0; i < RAJA_MAX_REDUCE_VARS; ++i) {
+      s->second.reduction_id_used[i] = false;
+    }
+  }
+}
+
 /*
 *******************************************************************************
 *
@@ -186,21 +209,9 @@ namespace
 */
 int getCudaReductionId_impl(void** host_val, void** init_dev_val)
 {
+  checkStream(getStream());
+
   auto s = s_cuda_stream_reducers.find(getStream());
-
-  // check if never seen this stream before
-  if (s == s_cuda_stream_reducers.end()) {
-    
-    s = s_cuda_stream_reducers.insert({getStream(), cuda_stream_reducers_t()}).first;
-
-    s->second.reduction_id_used = new bool[RAJA_MAX_REDUCE_VARS];
-    
-    s->second.reduction_variables = new cuda_reduction_variable_t[RAJA_MAX_REDUCE_VARS];
-
-    for (int i = 0; i < RAJA_MAX_REDUCE_VARS; ++i) {
-      s->second.reduction_id_used[i] = false;
-    }
-  }
 
   int id = 0;
   while (id < RAJA_MAX_REDUCE_VARS && s->second.reduction_id_used[id]) {

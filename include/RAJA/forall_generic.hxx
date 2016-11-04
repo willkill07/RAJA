@@ -93,6 +93,7 @@
 #include "RAJA/PolicyBase.hxx"
 #include "RAJA/fault_tolerance.hxx"
 #include "RAJA/int_datatypes.hxx"
+#include "RAJA/ListSegment.hxx"
 
 #include <functional>
 #include <iterator>
