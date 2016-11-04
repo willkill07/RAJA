@@ -101,12 +101,6 @@ __device__ __forceinline__ T shfl_xor(T var, int laneMask)
 
 } // end HIDDEN namespace for helper functions
 
-enum struct responsibility : char {
-  pass,
-  mine,
-  none
-};
-
 //
 //////////////////////////////////////////////////////////////////////
 //
@@ -176,16 +170,9 @@ public:
     __syncthreads();
 #else
     m_is_copy_host = true;
-    bool in_forall_streams = getCudaReductionTallyBlock<T>(m_myID,
+    getCudaReductionTallyBlock<T>(m_myID,
                                (void **)&m_tally_host,
                                (void **)&m_tally_device);
-    if (in_forall_streams) {
-      if (m_write_back_stream_reduction == responsibility::pass) {
-        m_write_back_stream_reduction = responsibility::mine;
-      } else {
-        m_write_back_stream_reduction = responsibility::none;
-      }
-    }
     m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
 #endif
   }
@@ -229,9 +216,6 @@ public:
       }
     }
 #else
-    if (m_write_back_stream_reduction == responsibility::mine) {
-      
-    }
     if (!m_is_copy_host) {
       releaseCudaReductionTallyBlock(m_myID);
       releaseCudaReductionId(m_myID);
@@ -322,7 +306,6 @@ private:
   bool m_is_copy_host = false;
   bool m_is_copy_device = false;
   bool m_finish_reduction_device = false;
-  responsibility m_write_back_stream_reduction = responsibility::pass;
 
   // Sanity checks for block size and template type size
   static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
@@ -403,16 +386,9 @@ public:
     __syncthreads();
 #else
     m_is_copy_host = true;
-    bool in_forall_streams = getCudaReductionTallyBlock<T>(m_myID,
+    getCudaReductionTallyBlock<T>(m_myID,
                                (void **)&m_tally_host,
                                (void **)&m_tally_device);
-    if (in_forall_streams) {
-      if (m_write_back_stream_reduction == responsibility::pass) {
-        m_write_back_stream_reduction = responsibility::mine;
-      } else {
-        m_write_back_stream_reduction = responsibility::none;
-      }
-    }
     m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
 #endif
   }
@@ -627,16 +603,9 @@ public:
 #else
     m_is_copy_host = true;
     getCudaReductionMemBlock(m_myID, (void **)&m_blockdata);
-    bool in_forall_streams = getCudaReductionTallyBlock<T>(m_myID,
+    getCudaReductionTallyBlock<T>(m_myID,
                                (void **)&m_tally_host,
                                (void **)&m_tally_device);
-    if (in_forall_streams) {
-      if (m_write_back_stream_reduction == responsibility::pass) {
-        m_write_back_stream_reduction = responsibility::mine;
-      } else {
-        m_write_back_stream_reduction = responsibility::none;
-      }
-    }
     m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
 #endif
   }
@@ -908,16 +877,9 @@ public:
     __syncthreads();
 #else
     m_is_copy_host = true;
-    bool in_forall_streams = getCudaReductionTallyBlock<T>(m_myID,
+    getCudaReductionTallyBlock<T>(m_myID,
                                (void **)&m_tally_host,
                                (void **)&m_tally_device);
-    if (in_forall_streams) {
-      if (m_write_back_stream_reduction == responsibility::pass) {
-        m_write_back_stream_reduction = responsibility::mine;
-      } else {
-        m_write_back_stream_reduction = responsibility::none;
-      }
-    }
     m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
 #endif
   }
@@ -1145,16 +1107,9 @@ public:
 #else
     m_is_copy_host = true;
     getCudaReductionMemBlock(m_myID, (void **)&m_blockdata);
-    bool in_forall_streams = getCudaReductionTallyBlock<CudaReductionLocType<T>>(m_myID,
+    getCudaReductionTallyBlock<CudaReductionLocType<T>>(m_myID,
                                (void **)&m_tally_host,
                                (void **)&m_tally_device);
-    if (in_forall_streams) {
-      if (m_write_back_stream_reduction == responsibility::pass) {
-        m_write_back_stream_reduction = responsibility::mine;
-      } else {
-        m_write_back_stream_reduction = responsibility::none;
-      }
-    }
     m_smem_offset =
         getCudaSharedmemOffset(m_myID, BLOCK_SIZE, 
                                (sizeof(T) + sizeof(Index_type)));
@@ -1503,16 +1458,9 @@ public:
 #else
     m_is_copy_host = true;
     getCudaReductionMemBlock(m_myID, (void **)&m_blockdata);
-    bool in_forall_streams = getCudaReductionTallyBlock<CudaReductionLocType<T>>(m_myID,
+    getCudaReductionTallyBlock<CudaReductionLocType<T>>(m_myID,
                                (void **)&m_tally_host,
                                (void **)&m_tally_device);
-    if (in_forall_streams) {
-      if (m_write_back_stream_reduction == responsibility::pass) {
-        m_write_back_stream_reduction = responsibility::mine;
-      } else {
-        m_write_back_stream_reduction = responsibility::none;
-      }
-    }
     m_smem_offset =
         getCudaSharedmemOffset(m_myID, BLOCK_SIZE, 
                                (sizeof(T) + sizeof(Index_type)));

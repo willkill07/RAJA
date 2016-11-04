@@ -275,7 +275,7 @@ bool getCudaReductionTallyBlock_impl(
 template < typename T >
 bool getCudaReductionTallyBlock(int id, void** host_tally, void** device_tally)
 {
-  CudaReductionDummyDataType* init_val_device;
+  CudaReductionDummyDataType* init_val_device = nullptr;
   bool in_streams = getCudaReductionTallyBlock_impl(id, host_tally, device_tally, &init_val_device);
 
   if (init_val_device != nullptr) {

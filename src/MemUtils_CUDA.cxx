@@ -83,7 +83,7 @@ namespace
   struct cuda_tally_state_t {
     bool dirty = false;
     bool assigned = false;
-  }
+  };
   
   struct cuda_stream_reducers_t {
     bool* reduction_id_used = nullptr;
@@ -151,6 +151,13 @@ namespace
     }
   }
 
+  void checkStreams(cudaStream_t const* streams, size_t len)
+  {
+    for (size_t i = 0; i < len; ++s) {
+      checkStream(streams[i]);
+    }
+  }
+
   void allocateReductionStreams() {
     if (s_reduction_streams == nullptr) {
       s_reduction_streams = new cudaStream_t[RAJA_MAX_REDUCE_VARS];
@@ -169,15 +176,6 @@ namespace
           delete[] s_reduction_events;
         }
       });
-    }
-  }
-
-  void registerStreams(cudaStream_t const* streams, size_t len)
-  {
-    allocateReductionStreams();
-    checkStream(getStream());
-    for (size_t i = 0; i < len; ++s) {
-      checkStream(streams[i]);
     }
   }
 
@@ -224,13 +222,17 @@ cudaEvent_t getEvent(cuda_stream_t stream)
 
 void splitStream(cudaStream_t const* streams, size_t len, cudaStream_t prev_stream)
 {
-  registerStreams(streams, len);
+  allocateReductionStreams();
+  checkStream(prev_stream);
+  checkStreams(streams, len);
 
   cudaEvent_t prev_event = getEvent(prev_stream);
   
   cudaErrchk(cudaEventRecord(prev_event, prev_stream));
   
   for(int i = 0; i < len; ++i) {
+    assert(streams[i] != prev_stream);
+
     cudaErrchk(cudaStreamWaitEvent(streams[i], prev_event, 0));
   }
 }

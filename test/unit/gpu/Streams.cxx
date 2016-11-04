@@ -128,16 +128,20 @@ int main(int argc, char *argv[])
 
       double dtinit = 5.0;
 
-      ReduceSum<cuda_reduce<block_size>, double> dsum(dtinit);
+      ReduceSum<seq_reduce, double> dsum(dtinit);
 
       forall< cuda_streams_exec< seq_exec > >(streams, NUM_STREAMS, [=] (cudaStream_t stream, int s) {
+
+        ReduceSum<cuda_reduce<block_size>, double> dsums(0.0);
 
         double* dvalue = dvalues[s];
 
         forall<cuda_exec_async<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
-          dsum += dvalue[i];
+          dsums += dvalue[i];
         });
-      } );
+
+        dsum += dsums;
+      });
 
       double base_chk_val = dinit_val * double(TEST_VEC_LEN * NUM_STREAMS);
 
@@ -166,28 +170,36 @@ int main(int argc, char *argv[])
 
       double dtinit = 5.0;
 
-      ReduceSum<cuda_reduce<block_size>, double> dsum(dtinit);
+      ReduceSum<omp_reduce, double> dsum(dtinit);
 
-      forall< cuda_streams_exec_async< seq_exec > >(streams, NUM_STREAMS, [=] (cudaStream_t stream, int s) {
+      forall< cuda_streams_exec_async< omp_parallel_for_exec > >(streams, NUM_STREAMS, [=] (cudaStream_t stream, int s) {
+
+        ReduceSum<cuda_reduce<block_size>, double> dsums(0.0);
 
         double* dvalue = dvalues[s];
 
         forall<cuda_exec_async<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
-          dsum += dvalue[i];
+          dsums += dvalue[i];
         });
+
+        dsum += dsums;
 
         forall<cuda_exec_async<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
           dvalue[i] = -dinit_val;
         });
       } );
 
-      forall< cuda_streams_exec< seq_exec > >(streams, NUM_STREAMS, [=] (int s) {
+      forall< cuda_streams_exec< omp_parallel_for_exec > >(streams, NUM_STREAMS, [=] (int s) {
+
+        ReduceSum<cuda_reduce<block_size>, double> dsums(0.0);
 
         double* dvalue = dvalues[NUM_STREAMS - 1 - s];
 
         forall<cuda_exec_async<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
-          dsum += dvalue[i];
+          dsums += dvalue[i];
         });
+
+        dsum += dsums;
 
         forall<cuda_exec_async<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
           dvalue[i] = dinit_val;
