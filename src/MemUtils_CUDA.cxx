@@ -337,8 +337,6 @@ bool getCudaReductionTallyBlock_impl(
         int id, void** host_tally, void** device_tally, 
         CudaReductionDummyDataType** init_device_value)
 {
-  CudaReductionDummyDataType* init_dev_val_ptr = nullptr;
-
   if (s_in_raja_cuda_forall) {
     
     auto s = s_cuda_stream_reducers.find(getStream());
@@ -360,8 +358,13 @@ bool getCudaReductionTallyBlock_impl(
       s->second.tally_valid = true;
       s->second.tally_dirty = 0;
     }
-    
+
     if (!s->second.tally_state[id].assigned) {
+      // first time used with this stream
+
+      // check id actually being used and this reduction isn't being passed in
+      // through a forall<streams>
+      assert(s->second.reduction_id_used[id]);
       
       s->second.tally_dirty += 1;
       // set block dirty
@@ -377,8 +380,6 @@ bool getCudaReductionTallyBlock_impl(
     host_tally[0]   = &s->second.tally_block_host[id];
     device_tally[0] = &s->second.tally_block_device[id];
   }
-
-  init_device_value[0] = init_dev_val_ptr;
 
   return s_in_cuda_forall_streams;
 }
