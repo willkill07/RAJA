@@ -207,7 +207,9 @@ cudaStream_t getReducerStream(int id);
 
 cudaEvent_t getReducerEvent(int id);
 
+void beforeCudaStreamsLaunch();
 
+void afterCudaStreamsLaunch();
 
 
 

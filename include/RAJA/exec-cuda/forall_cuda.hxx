@@ -315,21 +315,21 @@ RAJA_INLINE void forall(cuda_stream_exec<EXEC_TYPE, Async>,
   cudaStream_t prev_stream = getStream();
   splitStream(streams, len, prev_stream);
 
-  
-
-  forall<EXEC_TYPE>(0, len, [&](Index_type i)
+  beforeCudaStreamsLaunch();
   {
-    cudaStream_t stream = streams[i];
-    setStream(stream);
+    auto body = loop_body;
 
+    forall<EXEC_TYPE>(0, len, [&](Index_type i)
     {
-      auto body = loop_body;
-      
+      cudaStream_t stream = streams[i];
+      setStream(stream);
+
       body(stream, i);
-    }
-    
-    setStream(prev_stream);
-  });
+      
+      setStream(prev_stream);
+    });
+  }
+  afterCudaStreamsLaunch();
 
   joinStream(streams, len, prev_stream);
 

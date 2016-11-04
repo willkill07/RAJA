@@ -121,6 +121,8 @@ namespace
     }
   };
 
+  bool s_in_cuda_forall_streams = false;
+
   thread_local cudaStream_t s_currentStream = 0;
 
   cudaStream_t* s_reduction_streams = nullptr;
@@ -179,6 +181,18 @@ namespace
     }
   }
 
+}
+
+
+void beforeCudaStreamsLaunch()
+{
+  assert(!s_in_cuda_forall_streams);
+  s_in_cuda_forall_streams = true;
+}
+
+void afterCudaStreamsLaunch()
+{
+  s_in_cuda_forall_streams = false;
 }
 
 cudaStream_t getReducerStream(int id)
