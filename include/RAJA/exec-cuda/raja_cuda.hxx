@@ -170,7 +170,7 @@ using cuda_reduce_atomic_async = cuda_reduce_atomic<BLOCK_SIZE, true>;
 //
 
 void registerStreams(cudaStream_t const* streams, size_t num_streams);
-void useStream(cudaStream_t stream);
+void switchStream(cudaStream_t stream, cudaStream_t prev_stream, bool prev_event_recorded);
 cudaEvent_t getEvent(cudaStream_t stream);
 
 //
