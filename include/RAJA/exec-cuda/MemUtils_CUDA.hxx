@@ -199,6 +199,18 @@ struct CudaReductionTallyType {
   GridSizeType retiredBlocks;
 };
 
+
+
+
+
+cudaStream_t getReducerStream(int id);
+
+cudaEvent_t getReducerEvent(int id);
+
+
+
+
+
 /*!
  ******************************************************************************
  *

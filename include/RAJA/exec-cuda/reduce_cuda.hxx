@@ -61,11 +61,9 @@
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
 #include "RAJA/int_datatypes.hxx"
-
 #include "RAJA/reducers.hxx"
-
+#include "RAJA/exec-cuda/raja_cuda.hxx"
 #include "RAJA/exec-cuda/MemUtils_CUDA.hxx"
-
 #include "RAJA/exec-cuda/raja_cudaerrchk.hxx"
 
 #include <cuda.h>

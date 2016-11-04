@@ -184,9 +184,9 @@ using cuda_reduce_atomic_async = cuda_reduce_atomic<BLOCK_SIZE, true>;
 /////////////////////////////////////////////////////////////////////////////
 //
 
-extern void registerStreams(cudaStream_t const* streams, size_t num_streams);
-extern void switchStream(cudaStream_t stream, cudaStream_t prev_stream, bool prev_event_recorded = false);
-extern cudaEvent_t getEvent(cudaStream_t stream);
+void splitStream(cudaStream_t const* streams, size_t len, cudaStream_t prev_stream);
+void joinStream(cudaStream_t const* streams, size_t len, cudaStream_t prev_stream);
+void setStream(cudaStream_t stream);
 
 //
 // Operations in the included files are parametrized using the following

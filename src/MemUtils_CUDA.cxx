@@ -69,66 +69,8 @@
 namespace RAJA
 {
 
-static void checkStream(cudaStream_t stream);
-
 ////////////////////////////////////////////////////////////////////////////////////////////////
   
-namespace
-{
-  thread_local cudaStream_t currentStream = 0;
-  
-  std::unordered_map<cudaStream_t, cudaEvent_t> s_stream_events;
-}
-
-void registerStreams(cudaStream_t const* streams, size_t num_streams)
-{
-  {
-    checkStream(getStream());
-    auto s = s_stream_events.find(getStream());
-    if(s == s_stream_events.end()) {
-        cudaEvent_t event;
-        cudaErrchk(cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
-        s_stream_events.insert({getStream(), event});
-    }
-  }
-  for (size_t i = 0; i < num_streams; ++s) {
-    checkStream(streams[i]);
-    auto s = s_stream_events.find(streams[i]);
-    if(s == s_stream_events.end()) {
-        cudaEvent_t event;
-        cudaErrchk(cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
-        s_stream_events.insert({streams[i], event});
-    }
-  }
-}
-
-void switchStream(cudaStream_t stream, cudaStream_t prev_stream, bool prev_event_recorded)
-{
-  cudaEvent_t prev_event = getEvent(prev_stream);
-  
-  if (!prev_event_recorded) {
-    cudaErrchk(cudaEventRecord(prev_event, prev_stream));
-  }
-  
-  cudaErrchk(cudaStreamWaitEvent(stream, prev_event, 0));
-  
-  currentStream = stream;
-}
-
-void cudaStream_t getStream()
-{
-  return currentStream;
-}
-
-void cudaEvent_t getEvent(cuda_stream_t stream)
-{
-  auto s = s_stream_events.find(stream);
-  assert(s != s_stream_events.end());
-  return s->second;
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-
 namespace
 {
   struct cuda_reduction_variable_t {
@@ -150,6 +92,7 @@ namespace
     cuda_tally_state_t* tally_state = nullptr;
     CudaReductionDummyTallyType* tally_block_device = nullptr;
     CudaReductionDummyTallyType* tally_block_host = nullptr;
+    cudaEvent_t event;
     int smem_total = 0;
     int tally_dirty = 0;
     bool in_raja_cuda_forall = false;
@@ -174,29 +117,121 @@ namespace
       if (tally_block_host != nullptr) {
         delete[] tally_block_host;
       }
+      cudaErrchk(cudaEventDestroy(event));
     }
   };
+
+  thread_local cudaStream_t s_currentStream = 0;
+
+  cudaStream_t* s_reduction_streams = nullptr;
+  cudaEvent_t* s_reduction_events = nullptr;
   
   std::unordered_map< cudaStream_t, cuda_stream_reducers_t > s_cuda_stream_reducers;
-}
 
-static void checkStream(cudaStream_t stream)
-{
-  auto s = s_cuda_stream_reducers.find(stream);
+  void checkStream(cudaStream_t stream)
+  {
+    auto s = s_cuda_stream_reducers.find(stream);
 
-  // check if never seen this stream before
-  if (s == s_cuda_stream_reducers.end()) {
-    
-    s = s_cuda_stream_reducers.insert({stream, cuda_stream_reducers_t()}).first;
+    // check if never seen this stream before
+    if (s == s_cuda_stream_reducers.end()) {
+      
+      s = s_cuda_stream_reducers.insert({stream, cuda_stream_reducers_t()}).first;
 
-    s->second.reduction_id_used = new bool[RAJA_MAX_REDUCE_VARS];
-    
-    s->second.reduction_variables = new cuda_reduction_variable_t[RAJA_MAX_REDUCE_VARS];
+      s->second.reduction_id_used = new bool[RAJA_MAX_REDUCE_VARS];
+      
+      s->second.reduction_variables = new cuda_reduction_variable_t[RAJA_MAX_REDUCE_VARS];
 
-    for (int i = 0; i < RAJA_MAX_REDUCE_VARS; ++i) {
-      s->second.reduction_id_used[i] = false;
+      for (int i = 0; i < RAJA_MAX_REDUCE_VARS; ++i) {
+        s->second.reduction_id_used[i] = false;
+      }
+
+      cudaErrchk(cudaEventCreateWithFlags(&s->second.event, cudaEventDisableTiming));
     }
   }
+
+  void allocateReductionStreams() {
+    if (s_reduction_streams == nullptr) {
+      s_reduction_streams = new cudaStream_t[RAJA_MAX_REDUCE_VARS];
+      s_reduction_events = new cudaEvent_t[RAJA_MAX_REDUCE_VARS];
+      for( int i = 0; i < RAJA_MAX_REDUCE_VARS; ++i) {
+        cudaErrchk(cudaStreamCreateWithFlags(&s_reduction_streams[i], cudaStreamNonBlocking));
+        cudaErrchk(cudaEventCreateWithFlags(&s_reduction_events[i], cudaEventDisableTiming));
+      }
+      atexit([](){
+        if (s_reduction_streams != nullptr) {
+          for( int i = 0; i < RAJA_MAX_REDUCE_VARS; ++i) {
+            cudaErrchk(cudaStreamDestroy(s_reduction_streams[i]));
+            cudaErrchk(cudaEventDestroy(s_reduction_events[i]));
+          }
+          delete[] s_reduction_streams;
+          delete[] s_reduction_events;
+        }
+      });
+    }
+  }
+
+  void registerStreams(cudaStream_t const* streams, size_t len)
+  {
+    allocateReductionStreams();
+    checkStream(getStream());
+    for (size_t i = 0; i < len; ++s) {
+      checkStream(streams[i]);
+    }
+  }
+
+}
+
+cudaStream_t getReducerStream(int id)
+{
+  return s_reduction_streams[id];
+}
+
+cudaEvent_t getReducerEvent(int id)
+{
+  return s_reduction_events[id];
+}
+
+void setStream(cudaStream_t stream)
+{
+  s_currentStream = stream;
+}
+
+cudaStream_t getStream()
+{
+  return s_currentStream;
+}
+
+cudaEvent_t getEvent(cuda_stream_t stream)
+{
+  auto s = s_cuda_stream_reducers.find(stream);
+  assert(s != s_cuda_stream_reducers.end());
+  return s->second.event;
+}
+
+void splitStream(cudaStream_t const* streams, size_t len, cudaStream_t prev_stream)
+{
+  registerStreams(streams, len);
+
+  cudaEvent_t prev_event = getEvent(prev_stream);
+  
+  cudaErrchk(cudaEventRecord(prev_event, prev_stream));
+  
+  for(int i = 0; i < len; ++i) {
+    cudaErrchk(cudaStreamWaitEvent(streams[i], prev_event, 0));
+  }
+}
+
+void joinStream(cudaStream_t const* streams, size_t len, cudaStream_t prev_stream)
+{
+  for(int i = 0; i < len; ++i) {
+    cudaEvent_t event = getEvent(streams[i]);
+
+    cudaErrchk(cudaEventRecord(event, streams[i]));
+
+    cudaErrchk(cudaStreamWaitEvent(prev_stream, event, 0));
+  }
+
+  setStream(prev_stream);
 }
 
 /*
@@ -209,6 +244,7 @@ static void checkStream(cudaStream_t stream)
 */
 int getCudaReductionId_impl(void** host_val, void** init_dev_val)
 {
+  allocateReductionStreams();
   checkStream(getStream());
 
   auto s = s_cuda_stream_reducers.find(getStream());
@@ -355,7 +391,8 @@ static void writeBackCudaReductionTallyBlock()
         cudaErrchk(cudaMemcpyAsync(&s->second.tally_block_device[first],
                                    &s->second.tally_block_host[first],
                                    sizeof(CudaReductionDummyTallyType) * len,
-                                   cudaMemcpyHostToDevice));
+                                   cudaMemcpyHostToDevice,
+                                   getStream()));
         
         for (int i = first; i < end; ++i) {
           s->second.tally_state[i].dirty = false;
@@ -391,7 +428,8 @@ static void readCudaReductionTallyBlockAsync()
                                 &s->second.tally_block_device[0],
                                 sizeof(CudaReductionDummyTallyType) *
                                   RAJA_CUDA_REDUCE_TALLY_LENGTH,
-                                cudaMemcpyDeviceToHost));
+                                cudaMemcpyDeviceToHost,
+                                getStream()));
     s->second.tally_valid = true;
   }
 }
