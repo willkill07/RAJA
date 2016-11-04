@@ -315,26 +315,17 @@ RAJA_INLINE void forall(cuda_stream_exec<EXEC_TYPE, Async>,
   registerStreams(streams, len);
   
   cudaStream_t prev_stream = getStream();
-  cudaEvent_t prev_event = getEvent(prev_stream);
-  
-  cudaErrchk(cudaEventRecord(prev_event, prev_stream));
+  cudaErrchk(cudaEventRecord(getEvent(prev_stream), prev_stream));
 
   forall<EXEC_TYPE>(0, len, [=](Index_type i)
   {
     cudaStream_t stream = streams[i];
-    cudaErrchk(cudaStreamWaitEvent(stream, prev_event, 0));
-    
-    useStream(stream);
+    switchStream(stream, prev_stream, true);
     
     loop_body(stream);
     
-    cudaEvent_t event = getEvent(stream);
-    cudaErrchk(cudaEventRecord(event, stream));
-    
-    cudaErrchk(cudaStreamWaitEvent(prev_stream, event, 0));
+    switchStream(prev_stream, stream);
   });
-  
-  useStream(prev_stream);
 
   RAJA_CUDA_CHECK_AND_SYNC(Async);
 }
