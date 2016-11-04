@@ -90,14 +90,14 @@ int main(int argc, char *argv[])
 
       double dtinit = 5.0;
 
-      forall< cuda_streams_exec< seq_exec > >(streams, NUM_STREAMS, [=] (int s) {
+      forall< cuda_streams_exec< seq_exec > >(streams, NUM_STREAMS, [=] (cudaStream_t stream, int s) {
         s_ntests_run++;
 
         ReduceSum<cuda_reduce<block_size>, double> dsum(dtinit);
 
         double* dvalue = dvalues[s];
 
-        forall<cuda_exec<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
+        forall<cuda_exec_async<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
           dsum += dvalue[i];
         });
 
@@ -130,11 +130,11 @@ int main(int argc, char *argv[])
 
       ReduceSum<cuda_reduce<block_size>, double> dsum(dtinit);
 
-      forall< cuda_streams_exec< seq_exec > >(streams, NUM_STREAMS, [=] (int s) {
+      forall< cuda_streams_exec< seq_exec > >(streams, NUM_STREAMS, [=] (cudaStream_t stream, int s) {
 
         double* dvalue = dvalues[s];
 
-        forall<cuda_exec<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
+        forall<cuda_exec_async<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
           dsum += dvalue[i];
         });
       } );
@@ -168,15 +168,15 @@ int main(int argc, char *argv[])
 
       ReduceSum<cuda_reduce<block_size>, double> dsum(dtinit);
 
-      forall< cuda_streams_exec_async< seq_exec > >(streams, NUM_STREAMS, [=] (int s) {
+      forall< cuda_streams_exec_async< seq_exec > >(streams, NUM_STREAMS, [=] (cudaStream_t stream, int s) {
 
         double* dvalue = dvalues[s];
 
-        forall<cuda_exec<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
+        forall<cuda_exec_async<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
           dsum += dvalue[i];
         });
 
-        forall<cuda_exec<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
+        forall<cuda_exec_async<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
           dvalue[i] = -dinit_val;
         });
       } );
@@ -185,11 +185,11 @@ int main(int argc, char *argv[])
 
         double* dvalue = dvalues[NUM_STREAMS - 1 - s];
 
-        forall<cuda_exec<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
+        forall<cuda_exec_async<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
           dsum += dvalue[i];
         });
 
-        forall<cuda_exec<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
+        forall<cuda_exec_async<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
           dvalue[i] = dinit_val;
         });
       } );

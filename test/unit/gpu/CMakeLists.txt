@@ -99,6 +99,12 @@ add_test(
     NAME scan
     COMMAND ${TEST_DRIVER} $<TARGET_FILE:scan.exe>)
 
+cuda_add_executable(stream.exe
+  Streams.cxx)
+add_test(
+    NAME stream
+    COMMAND ${TEST_DRIVER} $<TARGET_FILE:stream.exe>)
+
 target_link_libraries(reducemin.exe RAJA)
 target_link_libraries(reducemax.exe RAJA)
 target_link_libraries(reducesum.exe RAJA)
@@ -106,3 +112,4 @@ target_link_libraries(traversal.exe RAJA)
 target_link_libraries(reduceminloc.exe RAJA)
 target_link_libraries(reducemaxloc.exe RAJA)
 target_link_libraries(scan.exe RAJA gtest gtest_main ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(stream.exe RAJA)
