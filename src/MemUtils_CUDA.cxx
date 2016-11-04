@@ -362,7 +362,7 @@ bool getCudaReductionTallyBlock_impl(
     if (!s->second.tally_state[id].assigned) {
       // first time used with this stream
 
-      // check id actually being used and this reduction isn't being passed in
+      // check id actually being used and this reduction wasn't passed in
       // through a forall<streams>
       assert(s->second.reduction_id_used[id]);
       
