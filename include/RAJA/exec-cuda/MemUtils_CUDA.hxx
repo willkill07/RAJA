@@ -257,6 +257,8 @@ void releaseCudaReductionId(int id);
  * \param[out] host_tally pointer to host tally cache slot.
  * \param[out] device_tally pointer to device tally slot.
  *
+ * \return bool in forall<cuda_streams>.
+ *
  * NOTE: Tally Block size will be:
  *
  *          sizeof(CudaReductionDummyTallyType) * RAJA_MAX_REDUCE_VARS
@@ -266,17 +268,20 @@ void releaseCudaReductionId(int id);
  *
  ******************************************************************************
  */
-CudaReductionDummyDataType* getCudaReductionTallyBlock_impl(
-                          int id, void** host_tally, void** device_tally);
+bool getCudaReductionTallyBlock_impl(
+        int id, void** host_tally, void** device_tally, 
+        CudaReductionDummyDataType** init_device_value);
 ///
 template < typename T >
-void getCudaReductionTallyBlock(int id, void** host_tally, void** device_tally)
+bool getCudaReductionTallyBlock(int id, void** host_tally, void** device_tally)
 {
-  CudaReductionDummyDataType* init_val_device = 
-      getCudaReductionTallyBlock_impl(id, host_tally, device_tally);
+  CudaReductionDummyDataType* init_val_device;
+  bool in_streams = getCudaReductionTallyBlock_impl(id, host_tally, device_tally, &init_val_device);
+
   if (init_val_device != nullptr) {
     ((CudaReductionTallyType<T>**)host_tally)[0][0].tally = ((T*)init_val_device)[0];
   }
+  return in_streams;
 }
 
 /*!

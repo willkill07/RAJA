@@ -312,28 +312,28 @@ RAJA_INLINE void forall(cuda_stream_exec<EXEC_TYPE, Async>,
                         Index_type len,
                         LOOP_BODY&& loop_body)
 {
+  beforeCudaStreamsLaunch();
+
   cudaStream_t prev_stream = getStream();
   splitStream(streams, len, prev_stream);
-
-  beforeCudaStreamsLaunch();
+  
+  forall<EXEC_TYPE>(0, len, [&](Index_type i)
   {
     auto body = loop_body;
 
-    forall<EXEC_TYPE>(0, len, [&](Index_type i)
-    {
-      cudaStream_t stream = streams[i];
-      setStream(stream);
+    cudaStream_t stream = streams[i];
+    setStream(stream);
 
-      body(stream, i);
-      
-      setStream(prev_stream);
-    });
-  }
-  afterCudaStreamsLaunch();
+    body(stream, i);
+    
+    setStream(prev_stream);
+  });
 
   joinStream(streams, len, prev_stream);
 
   RAJA_CUDA_CHECK_AND_SYNC(Async);
+
+  afterCudaStreamsLaunch();
 }
 
 }  // closing brace for RAJA namespace

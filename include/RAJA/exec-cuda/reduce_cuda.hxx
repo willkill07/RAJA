@@ -101,6 +101,12 @@ __device__ __forceinline__ T shfl_xor(T var, int laneMask)
 
 } // end HIDDEN namespace for helper functions
 
+enum struct responsibility : char {
+  pass,
+  mine,
+  none
+};
+
 //
 //////////////////////////////////////////////////////////////////////
 //
@@ -149,7 +155,7 @@ public:
     *this = other;
 #if defined(__CUDA_ARCH__)
     m_is_copy_device = true;
-    m_finish_reduction = !other.m_is_copy_device;
+    m_finish_reduction_device = !other.m_is_copy_device;
     extern __shared__ unsigned char sd_block[];
     T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
 
@@ -170,9 +176,16 @@ public:
     __syncthreads();
 #else
     m_is_copy_host = true;
-    getCudaReductionTallyBlock<T>(m_myID,
+    bool in_forall_streams = getCudaReductionTallyBlock<T>(m_myID,
                                (void **)&m_tally_host,
                                (void **)&m_tally_device);
+    if (in_forall_streams) {
+      if (m_write_back_stream_reduction == responsibility::pass) {
+        m_write_back_stream_reduction = responsibility::mine;
+      } else {
+        m_write_back_stream_reduction = responsibility::none;
+      }
+    }
     m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
 #endif
   }
@@ -189,7 +202,7 @@ public:
   __host__ __device__ ~ReduceMin<cuda_reduce<BLOCK_SIZE, Async>, T>()
   {
 #if defined(__CUDA_ARCH__)
-    if (m_finish_reduction) {
+    if (m_finish_reduction_device) {
       extern __shared__ unsigned char sd_block[];
       T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
 
@@ -216,6 +229,9 @@ public:
       }
     }
 #else
+    if (m_write_back_stream_reduction == responsibility::mine) {
+      
+    }
     if (!m_is_copy_host) {
       releaseCudaReductionTallyBlock(m_myID);
       releaseCudaReductionId(m_myID);
@@ -305,7 +321,8 @@ private:
    */
   bool m_is_copy_host = false;
   bool m_is_copy_device = false;
-  bool m_finish_reduction = false;
+  bool m_finish_reduction_device = false;
+  responsibility m_write_back_stream_reduction = responsibility::pass;
 
   // Sanity checks for block size and template type size
   static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
@@ -364,7 +381,7 @@ public:
     *this = other;
 #if defined(__CUDA_ARCH__)
     m_is_copy_device = true;
-    m_finish_reduction = !other.m_is_copy_device;
+    m_finish_reduction_device = !other.m_is_copy_device;
     extern __shared__ unsigned char sd_block[];
     T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
 
@@ -386,9 +403,16 @@ public:
     __syncthreads();
 #else
     m_is_copy_host = true;
-    getCudaReductionTallyBlock<T>(m_myID,
+    bool in_forall_streams = getCudaReductionTallyBlock<T>(m_myID,
                                (void **)&m_tally_host,
                                (void **)&m_tally_device);
+    if (in_forall_streams) {
+      if (m_write_back_stream_reduction == responsibility::pass) {
+        m_write_back_stream_reduction = responsibility::mine;
+      } else {
+        m_write_back_stream_reduction = responsibility::none;
+      }
+    }
     m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
 #endif
   }
@@ -405,7 +429,7 @@ public:
   __host__ __device__ ~ReduceMax<cuda_reduce<BLOCK_SIZE, Async>, T>()
   {
 #if defined(__CUDA_ARCH__)
-    if (m_finish_reduction) {
+    if (m_finish_reduction_device) {
       extern __shared__ unsigned char sd_block[];
       T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
 
@@ -521,7 +545,7 @@ private:
    */
   bool m_is_copy_host = false;
   bool m_is_copy_device = false;
-  bool m_finish_reduction = false;
+  bool m_finish_reduction_device = false;
 
   // Sanity checks for block size and template type size
   static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
@@ -580,7 +604,7 @@ public:
     *this = other;
 #if defined(__CUDA_ARCH__)
     m_is_copy_device = true;
-    m_finish_reduction = !other.m_is_copy_device;
+    m_finish_reduction_device = !other.m_is_copy_device;
     extern __shared__ unsigned char sd_block[];
     T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
 
@@ -603,9 +627,16 @@ public:
 #else
     m_is_copy_host = true;
     getCudaReductionMemBlock(m_myID, (void **)&m_blockdata);
-    getCudaReductionTallyBlock<T>(m_myID,
-                                  (void **)&m_tally_host,
-                                  (void **)&m_tally_device);
+    bool in_forall_streams = getCudaReductionTallyBlock<T>(m_myID,
+                               (void **)&m_tally_host,
+                               (void **)&m_tally_device);
+    if (in_forall_streams) {
+      if (m_write_back_stream_reduction == responsibility::pass) {
+        m_write_back_stream_reduction = responsibility::mine;
+      } else {
+        m_write_back_stream_reduction = responsibility::none;
+      }
+    }
     m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
 #endif
   }
@@ -622,7 +653,7 @@ public:
   __host__ __device__ ~ReduceSum<cuda_reduce<BLOCK_SIZE, Async>, T>()
   {
 #if defined(__CUDA_ARCH__)
-    if (m_finish_reduction) {
+    if (m_finish_reduction_device) {
       extern __shared__ unsigned char sd_block[];
       T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
 
@@ -795,7 +826,7 @@ private:
    */
   bool m_is_copy_host = false;
   bool m_is_copy_device = false;
-  bool m_finish_reduction = false;
+  bool m_finish_reduction_device = false;
 
   // Sanity checks for block size and template type size
   static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
@@ -855,7 +886,7 @@ public:
     *this = other;
 #if defined(__CUDA_ARCH__)
     m_is_copy_device = true;
-    m_finish_reduction = !other.m_is_copy_device;
+    m_finish_reduction_device = !other.m_is_copy_device;
     extern __shared__ unsigned char sd_block[];
     T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
 
@@ -877,9 +908,16 @@ public:
     __syncthreads();
 #else
     m_is_copy_host = true;
-    getCudaReductionTallyBlock<T>(m_myID,
-                                  (void **)&m_tally_host,
-                                  (void **)&m_tally_device);
+    bool in_forall_streams = getCudaReductionTallyBlock<T>(m_myID,
+                               (void **)&m_tally_host,
+                               (void **)&m_tally_device);
+    if (in_forall_streams) {
+      if (m_write_back_stream_reduction == responsibility::pass) {
+        m_write_back_stream_reduction = responsibility::mine;
+      } else {
+        m_write_back_stream_reduction = responsibility::none;
+      }
+    }
     m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
 #endif
   }
@@ -896,7 +934,7 @@ public:
   __host__ __device__ ~ReduceSum<cuda_reduce_atomic<BLOCK_SIZE, Async>, T>()
   {
 #if defined(__CUDA_ARCH__)
-    if (m_finish_reduction) {
+    if (m_finish_reduction_device) {
       extern __shared__ unsigned char sd_block[];
       T *sd = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
 
@@ -1019,7 +1057,7 @@ private:
    */
   bool m_is_copy_host = false;
   bool m_is_copy_device = false;
-  bool m_finish_reduction = false;
+  bool m_finish_reduction_device = false;
 
   // Sanity checks for block size and template type size
   static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
@@ -1079,7 +1117,7 @@ public:
     *this = other;
 #if defined(__CUDA_ARCH__)
     m_is_copy_device = true;
-    m_finish_reduction = !other.m_is_copy_device;
+    m_finish_reduction_device = !other.m_is_copy_device;
     extern __shared__ unsigned char sd_block[];
     T *sd_val = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
     Index_type *sd_idx = reinterpret_cast<Index_type *>(
@@ -1107,9 +1145,16 @@ public:
 #else
     m_is_copy_host = true;
     getCudaReductionMemBlock(m_myID, (void **)&m_blockdata);
-    getCudaReductionTallyBlock<CudaReductionLocType<T>>(m_myID,
-                                  (void **)&m_tally_host,
-                                  (void **)&m_tally_device);
+    bool in_forall_streams = getCudaReductionTallyBlock<CudaReductionLocType<T>>(m_myID,
+                               (void **)&m_tally_host,
+                               (void **)&m_tally_device);
+    if (in_forall_streams) {
+      if (m_write_back_stream_reduction == responsibility::pass) {
+        m_write_back_stream_reduction = responsibility::mine;
+      } else {
+        m_write_back_stream_reduction = responsibility::none;
+      }
+    }
     m_smem_offset =
         getCudaSharedmemOffset(m_myID, BLOCK_SIZE, 
                                (sizeof(T) + sizeof(Index_type)));
@@ -1128,7 +1173,7 @@ public:
   __host__ __device__ ~ReduceMinLoc<cuda_reduce<BLOCK_SIZE, Async>, T>()
   {
 #if defined(__CUDA_ARCH__)
-    if (m_finish_reduction) {
+    if (m_finish_reduction_device) {
       extern __shared__ unsigned char sd_block[];
       T *sd_val = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
       Index_type *sd_idx = reinterpret_cast<Index_type *>(
@@ -1369,7 +1414,7 @@ private:
    */
   bool m_is_copy_host = false;
   bool m_is_copy_device = false;
-  bool m_finish_reduction = false;
+  bool m_finish_reduction_device = false;
 
   // Sanity checks for block size and template type size
   static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));
@@ -1430,7 +1475,7 @@ public:
     *this = other;
 #if defined(__CUDA_ARCH__)
     m_is_copy_device = true;
-    m_finish_reduction = !other.m_is_copy_device;
+    m_finish_reduction_device = !other.m_is_copy_device;
     extern __shared__ unsigned char sd_block[];
     T *sd_val = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
     Index_type *sd_idx = reinterpret_cast<Index_type *>(
@@ -1458,9 +1503,16 @@ public:
 #else
     m_is_copy_host = true;
     getCudaReductionMemBlock(m_myID, (void **)&m_blockdata);
-    getCudaReductionTallyBlock<CudaReductionLocType<T>>(m_myID,
+    bool in_forall_streams = getCudaReductionTallyBlock<CudaReductionLocType<T>>(m_myID,
                                (void **)&m_tally_host,
                                (void **)&m_tally_device);
+    if (in_forall_streams) {
+      if (m_write_back_stream_reduction == responsibility::pass) {
+        m_write_back_stream_reduction = responsibility::mine;
+      } else {
+        m_write_back_stream_reduction = responsibility::none;
+      }
+    }
     m_smem_offset =
         getCudaSharedmemOffset(m_myID, BLOCK_SIZE, 
                                (sizeof(T) + sizeof(Index_type)));
@@ -1479,7 +1531,7 @@ public:
   __host__ __device__ ~ReduceMaxLoc<cuda_reduce<BLOCK_SIZE, Async>, T>()
   {
 #if defined(__CUDA_ARCH__)
-    if (m_finish_reduction) {
+    if (m_finish_reduction_device) {
       extern __shared__ unsigned char sd_block[];
       T *sd_val = reinterpret_cast<T *>(&sd_block[m_smem_offset]);
       Index_type *sd_idx = reinterpret_cast<Index_type *>(
@@ -1718,7 +1770,7 @@ private:
    */
   bool m_is_copy_host = false;
   bool m_is_copy_device = false;
-  bool m_finish_reduction = false;
+  bool m_finish_reduction_device = false;
 
   // Sanity checks for block size and template type size
   static constexpr bool powerOfTwoCheck = (!(BLOCK_SIZE & (BLOCK_SIZE - 1)));

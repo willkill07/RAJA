@@ -331,8 +331,9 @@ void getCudaReductionMemBlock(int id, void** device_memblock)
 *
 *******************************************************************************
 */
-CudaReductionDummyDataType* getCudaReductionTallyBlock_impl(
-                              int id, void** host_tally, void** device_tally)
+bool getCudaReductionTallyBlock_impl(
+        int id, void** host_tally, void** device_tally, 
+        CudaReductionDummyDataType** init_device_value)
 {
   CudaReductionDummyDataType* init_dev_val_ptr = nullptr;
 
@@ -375,7 +376,9 @@ CudaReductionDummyDataType* getCudaReductionTallyBlock_impl(
     device_tally[0] = &s->second.tally_block_device[id];
   }
 
-  return init_dev_val_ptr;
+  init_device_value[0] = init_dev_val_ptr;
+
+  return s_in_cuda_forall_streams;
 }
 
 /*
