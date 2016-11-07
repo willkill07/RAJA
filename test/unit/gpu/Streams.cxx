@@ -44,8 +44,6 @@ int main(int argc, char *argv[])
     cudaStreamCreateWithFlags ( &streams[s], cudaStreamNonBlocking );
   }
 
-  RAJA::initWithStreams(streams, NUM_STREAMS);
-
   //
   // Allocate and initialize managed data arrays
   //
@@ -90,7 +88,7 @@ int main(int argc, char *argv[])
 
       double dtinit = 5.0;
 
-      forall< cuda_streams_exec< seq_exec > >(streams, NUM_STREAMS, [=] (cudaStream_t stream, int s) {
+      forall< cuda_stream_exec< seq_exec > >(streams, NUM_STREAMS, [=] (cudaStream_t stream, int s) {
         s_ntests_run++;
 
         ReduceSum<cuda_reduce<block_size>, double> dsum(dtinit);
@@ -104,7 +102,7 @@ int main(int argc, char *argv[])
         double base_chk_val = dinit_val * double(TEST_VEC_LEN);
 
         if (!equal(double(dsum), dtinit + base_chk_val)) {
-          cout << "\n TEST 1 FAILURE: tcount, k = " << tcount << " , " << k
+          cout << "\n TEST 1 FAILURE: tcount, s = " << tcount << " , " << s
                << endl;
           cout << "\ts = " << s
                << endl;
@@ -130,7 +128,7 @@ int main(int argc, char *argv[])
 
       ReduceSum<seq_reduce, double> dsum(dtinit);
 
-      forall< cuda_streams_exec< seq_exec > >(streams, NUM_STREAMS, [=] (cudaStream_t stream, int s) {
+      forall< cuda_stream_exec< seq_exec > >(streams, NUM_STREAMS, [=] (cudaStream_t stream, int s) {
 
         ReduceSum<cuda_reduce<block_size>, double> dsums(0.0);
 
@@ -146,7 +144,7 @@ int main(int argc, char *argv[])
       double base_chk_val = dinit_val * double(TEST_VEC_LEN * NUM_STREAMS);
 
       if (!equal(double(dsum), dtinit + base_chk_val)) {
-        cout << "\n TEST 2 FAILURE: tcount, k = " << tcount << " , " << k
+        cout << "\n TEST 2 FAILURE: tcount = " << tcount <<
              << endl;
         cout << setprecision(20) << "\tdsum = " << static_cast<double>(dsum)
              << " (" << dtinit + base_chk_val << ") " << endl;
@@ -172,7 +170,7 @@ int main(int argc, char *argv[])
 
       ReduceSum<omp_reduce, double> dsum(dtinit);
 
-      forall< cuda_streams_exec_async< omp_parallel_for_exec > >(streams, NUM_STREAMS, [=] (cudaStream_t stream, int s) {
+      forall< cuda_stream_exec_async< omp_parallel_for_exec > >(streams, NUM_STREAMS, [=] (cudaStream_t stream, int s) {
 
         ReduceSum<cuda_reduce<block_size>, double> dsums(0.0);
 
@@ -189,7 +187,7 @@ int main(int argc, char *argv[])
         });
       } );
 
-      forall< cuda_streams_exec< omp_parallel_for_exec > >(streams, NUM_STREAMS, [=] (int s) {
+      forall< cuda_stream_exec< omp_parallel_for_exec > >(streams, NUM_STREAMS, [=] (int s) {
 
         ReduceSum<cuda_reduce<block_size>, double> dsums(0.0);
 
@@ -209,7 +207,7 @@ int main(int argc, char *argv[])
       double base_chk_val = 0.0;
 
       if (!equal(double(dsum), dtinit + base_chk_val)) {
-        cout << "\n TEST 3 FAILURE: tcount, k = " << tcount << " , " << k
+        cout << "\n TEST 3 FAILURE: tcount = " << tcount <<
              << endl;
         cout << setprecision(20) << "\tdsum = " << static_cast<double>(dsum)
              << " (" << dtinit + base_chk_val << ") " << endl;

@@ -94,6 +94,7 @@
 #include "RAJA/fault_tolerance.hxx"
 #include "RAJA/int_datatypes.hxx"
 #include "RAJA/ListSegment.hxx"
+#include "RAJA/IndexSet.hxx"
 
 #include <functional>
 #include <iterator>

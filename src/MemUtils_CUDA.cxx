@@ -65,6 +65,7 @@
 #include <string>
 #include <cassert>
 #include <cstring>
+#include <unordered_map>
 
 namespace RAJA
 {
@@ -74,8 +75,8 @@ namespace RAJA
 namespace
 {
   struct cuda_reduction_variable_t {
-    CudaReductionDummyDataType host_value = {0};
-    CudaReductionDummyDataType init_device_value = {0};
+    CudaReductionDummyDataType host_value = {{0}};
+    CudaReductionDummyDataType init_device_value = {{0}};
     int smem_offset = -1;
     int num_threads = -1;
   };
@@ -153,7 +154,7 @@ namespace
 
   void checkStreams(cudaStream_t const* streams, size_t len)
   {
-    for (size_t i = 0; i < len; ++s) {
+    for (size_t i = 0; i < len; ++i) {
       checkStream(streams[i]);
     }
   }
@@ -213,7 +214,7 @@ cudaStream_t getStream()
   return s_currentStream;
 }
 
-cudaEvent_t getEvent(cuda_stream_t stream)
+cudaEvent_t getEvent(cudaStream_t stream)
 {
   auto s = s_cuda_stream_reducers.find(stream);
   assert(s != s_cuda_stream_reducers.end());
@@ -337,11 +338,11 @@ bool getCudaReductionTallyBlock_impl(
         int id, void** host_tally, void** device_tally, 
         CudaReductionDummyDataType** init_device_value)
 {
-  if (s_in_raja_cuda_forall) {
-    
-    auto s = s_cuda_stream_reducers.find(getStream());
-    
-    assert (s != s_cuda_stream_reducers.end());
+  auto s = s_cuda_stream_reducers.find(getStream());
+
+  assert (s != s_cuda_stream_reducers.end());
+
+  if (s->second.in_raja_cuda_forall) {
 
     if (s->second.tally_state == nullptr) {
       
@@ -371,7 +372,7 @@ bool getCudaReductionTallyBlock_impl(
       s->second.tally_state[id].dirty = true;
       s->second.tally_state[id].assigned = true;
 
-      init_dev_val_ptr = &s->second.reduction_variables[id].init_device_value;
+      init_device_value[0] = &s->second.reduction_variables[id].init_device_value;
 
       memset(&s->second.tally_block_host[id], 0, 
                         sizeof(CudaReductionDummyTallyType));
@@ -600,7 +601,7 @@ int getCudaSharedmemOffset(int id, dim3 reductionBlockDim, int size)
     if (s->second.reduction_variables[id].smem_offset < 0) {
       // in a forall and have not yet gotten shared memory
 
-      s->second.reduction_variables[id].smem_offset = s_shared_memory_amount_total;
+      s->second.reduction_variables[id].smem_offset = s->second.smem_total;
 
       int num_threads = 
           reductionBlockDim.x * reductionBlockDim.y * reductionBlockDim.z;
