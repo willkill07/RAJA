@@ -27,6 +27,24 @@
 using namespace RAJA;
 using namespace std;
 
+template <typename T, int Block_Size, bool Async = false>
+T sum_array(T init_val, T const* dvalue, int len) {
+  ReduceSum<cuda_reduce<Block_Size, Async>, T> dsums(init_val);
+
+  forall<cuda_exec<Block_Size, Async> >(0, len, [=] __device__(int i) {
+    dsums += dvalue[i];
+  });
+
+  return dsums.get();
+}
+
+template <typename T, int Block_Size, bool Async = false>
+void set_array(T val, T * dvalue, int len) {
+  forall<cuda_exec<Block_Size, Async> >(0, len, [=] __device__(int i) {
+    dvalue[i] = val;
+  });
+}
+
 //
 // Global variables for counting tests executed/passed.
 //
@@ -86,18 +104,12 @@ int main(int argc, char *argv[])
     //
     {  // begin test 1
 
-      double dtinit = 5.0;
-
       forall< cuda_stream_exec< seq_exec > >(streams, NUM_STREAMS, [=] (cudaStream_t stream, int s) {
         s_ntests_run++;
 
-        ReduceSum<cuda_reduce<block_size>, double> dsum(dtinit);
+        double dtinit = s;
 
-        double* dvalue = dvalues[s];
-
-        forall<cuda_exec_async<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
-          dsum += dvalue[i];
-        });
+        double dsum = sum_array<double, block_size, true>(dtinit, dvalues[s], TEST_VEC_LEN);
 
         double base_chk_val = dinit_val * double(TEST_VEC_LEN);
 
@@ -129,22 +141,13 @@ int main(int argc, char *argv[])
       ReduceSum<seq_reduce, double> dsum(dtinit);
 
       forall< cuda_stream_exec< seq_exec > >(streams, NUM_STREAMS, [=] (cudaStream_t stream, int s) {
-
-        ReduceSum<cuda_reduce<block_size>, double> dsums(0.0);
-
-        double* dvalue = dvalues[s];
-
-        forall<cuda_exec_async<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
-          dsums += dvalue[i];
-        });
-
-        dsum += dsums;
+        dsum += sum_array<double, block_size, true>(0.0, dvalues[s], TEST_VEC_LEN);
       });
 
       double base_chk_val = dinit_val * double(TEST_VEC_LEN * NUM_STREAMS);
 
       if (!equal(double(dsum), dtinit + base_chk_val)) {
-        cout << "\n TEST 2 FAILURE: tcount = " << tcount <<
+        cout << "\n TEST 2 FAILURE: tcount = " << tcount
              << endl;
         cout << setprecision(20) << "\tdsum = " << static_cast<double>(dsum)
              << " (" << dtinit + base_chk_val << ") " << endl;
@@ -172,42 +175,22 @@ int main(int argc, char *argv[])
 
       forall< cuda_stream_exec_async< omp_parallel_for_exec > >(streams, NUM_STREAMS, [=] (cudaStream_t stream, int s) {
 
-        ReduceSum<cuda_reduce<block_size>, double> dsums(0.0);
+        dsum += sum_array<double, block_size, true>(0.0, dvalues[s], TEST_VEC_LEN);
 
-        double* dvalue = dvalues[s];
-
-        forall<cuda_exec_async<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
-          dsums += dvalue[i];
-        });
-
-        dsum += dsums;
-
-        forall<cuda_exec_async<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
-          dvalue[i] = -dinit_val;
-        });
+        set_array<double, block_size, true>(-dinit_val, dvalues[s], TEST_VEC_LEN);
       } );
 
-      forall< cuda_stream_exec< omp_parallel_for_exec > >(streams, NUM_STREAMS, [=] (int s) {
+      forall< cuda_stream_exec< omp_parallel_for_exec > >(streams, NUM_STREAMS, [=] (cudaStream_t stream, int s) {
 
-        ReduceSum<cuda_reduce<block_size>, double> dsums(0.0);
+        dsum += sum_array<double, block_size, true>(0.0, dvalues[NUM_STREAMS - s - 1], TEST_VEC_LEN);
 
-        double* dvalue = dvalues[NUM_STREAMS - 1 - s];
-
-        forall<cuda_exec_async<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
-          dsums += dvalue[i];
-        });
-
-        dsum += dsums;
-
-        forall<cuda_exec_async<block_size> >(0, TEST_VEC_LEN, [=] __device__(int i) {
-          dvalue[i] = dinit_val;
-        });
+        set_array<double, block_size, true>(dinit_val, dvalues[NUM_STREAMS - s - 1], TEST_VEC_LEN);
       } );
 
       double base_chk_val = 0.0;
 
       if (!equal(double(dsum), dtinit + base_chk_val)) {
-        cout << "\n TEST 3 FAILURE: tcount = " << tcount <<
+        cout << "\n TEST 3 FAILURE: tcount = " << tcount
              << endl;
         cout << setprecision(20) << "\tdsum = " << static_cast<double>(dsum)
              << " (" << dtinit + base_chk_val << ") " << endl;
@@ -228,11 +211,14 @@ int main(int argc, char *argv[])
   cout << "\n Tests Passed / Tests Run = " << s_ntests_passed << " / "
        << s_ntests_run << endl;
 
-  cudaFree(dvalue);
-  cudaFree(ivalue);
+  for(int s = 0; s < NUM_STREAMS; ++s) {
+    cudaFree(dvalues[s]);
+  }
 
-  free(hdvalue);
-  free(hivalue);
+  for(int s = 0; s < NUM_STREAMS; ++s) {
+    cudaFree(ivalues[s]);
+  }
 
+  return 0;
   return !(s_ntests_passed == s_ntests_run);
 }

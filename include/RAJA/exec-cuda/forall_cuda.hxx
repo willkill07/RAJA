@@ -306,7 +306,7 @@ RAJA_INLINE void forall(cudaStream_t const* streams,
   forall(EXEC_POLICY_T(), streams, len, std::forward<LOOP_BODY>(loop_body));
 }
 
-template <typename EXEC_TYPE, bool Async, typename Iterable, typename LOOP_BODY>
+template <typename EXEC_TYPE, bool Async, typename LOOP_BODY>
 RAJA_INLINE void forall(cuda_stream_exec<EXEC_TYPE, Async>,
                         cudaStream_t const* streams,
                         Index_type len,

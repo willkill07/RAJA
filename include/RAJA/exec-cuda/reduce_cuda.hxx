@@ -699,6 +699,7 @@ public:
       }
     }
 #else
+
     if (!m_is_copy_host) {
       releaseCudaReductionTallyBlock(m_myID);
       releaseCudaReductionId(m_myID);
@@ -713,7 +714,9 @@ public:
    */
   operator T()
   {
+
     T* dev_val = beforeCudaReadTallyBlock<T, Async>(m_myID);
+
     T reduced_val;
     if (dev_val != nullptr) {
       reduced_val = m_reduced_val_host[0] + dev_val[0];
@@ -747,6 +750,7 @@ public:
 
     sd[threadId] += val;
 #else
+
     m_reduced_val_host[0] += val;
 #endif
 

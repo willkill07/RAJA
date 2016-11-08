@@ -98,6 +98,51 @@ namespace
     int tally_dirty = 0;
     bool in_raja_cuda_forall = false;
     bool tally_valid = true;
+
+    cuda_stream_reducers_t() {
+      cudaErrchk(cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
+    }
+
+    cuda_stream_reducers_t(cuda_stream_reducers_t const& other)
+      : reduction_id_used(other.reduction_id_used),
+        reduction_variables(other.reduction_variables),
+        mem_block(other.mem_block),
+        tally_state(other.tally_state),
+        tally_block_device(other.tally_block_device),
+        tally_block_host(other.tally_block_host),
+        smem_total(other.smem_total),
+        tally_dirty(other.tally_dirty),
+        in_raja_cuda_forall(other.in_raja_cuda_forall),
+        tally_valid(other.tally_valid)
+    {
+      cudaErrchk(cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
+    }
+
+    cuda_stream_reducers_t(cuda_stream_reducers_t&& other)
+      : reduction_id_used(other.reduction_id_used),
+        reduction_variables(other.reduction_variables),
+        mem_block(other.mem_block),
+        tally_state(other.tally_state),
+        tally_block_device(other.tally_block_device),
+        tally_block_host(other.tally_block_host),
+        smem_total(other.smem_total),
+        tally_dirty(other.tally_dirty),
+        in_raja_cuda_forall(other.in_raja_cuda_forall),
+        tally_valid(other.tally_valid)
+    {
+      other.reduction_id_used = nullptr;
+      other.reduction_variables = nullptr;
+      other.mem_block = nullptr;
+      other.tally_state = nullptr;
+      other.tally_block_device = nullptr;
+      other.tally_block_host = nullptr;
+      other.smem_total = 0;
+      other.tally_dirty = 0;
+      other.in_raja_cuda_forall = false;
+      other.tally_valid = true;
+
+      cudaErrchk(cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
+    }
     
     ~cuda_stream_reducers_t() {
       if (reduction_id_used != nullptr) {
@@ -120,6 +165,9 @@ namespace
       }
       cudaErrchk(cudaEventDestroy(event));
     }
+
+  private:
+    cuda_stream_reducers_t& operator=(cuda_stream_reducers_t const& other);
   };
 
   bool s_in_cuda_forall_streams = false;
@@ -147,8 +195,6 @@ namespace
       for (int i = 0; i < RAJA_MAX_REDUCE_VARS; ++i) {
         s->second.reduction_id_used[i] = false;
       }
-
-      cudaErrchk(cudaEventCreateWithFlags(&s->second.event, cudaEventDisableTiming));
     }
   }
 
@@ -175,6 +221,7 @@ namespace
           }
           delete[] s_reduction_streams;
           delete[] s_reduction_events;
+          s_cuda_stream_reducers.clear();
         }
       });
     }
@@ -223,6 +270,7 @@ cudaEvent_t getEvent(cudaStream_t stream)
 
 void splitStream(cudaStream_t const* streams, size_t len, cudaStream_t prev_stream)
 {
+  
   allocateReductionStreams();
   checkStream(prev_stream);
   checkStreams(streams, len);
@@ -240,6 +288,7 @@ void splitStream(cudaStream_t const* streams, size_t len, cudaStream_t prev_stre
 
 void joinStream(cudaStream_t const* streams, size_t len, cudaStream_t prev_stream)
 {
+  
   for(int i = 0; i < len; ++i) {
     cudaEvent_t event = getEvent(streams[i]);
 
@@ -261,6 +310,7 @@ void joinStream(cudaStream_t const* streams, size_t len, cudaStream_t prev_strea
 */
 int getCudaReductionId_impl(void** host_val, void** init_dev_val)
 {
+  
   allocateReductionStreams();
   checkStream(getStream());
 
@@ -294,6 +344,7 @@ int getCudaReductionId_impl(void** host_val, void** init_dev_val)
 */
 void releaseCudaReductionId(int id)
 {
+  
   auto s = s_cuda_stream_reducers.find(getStream());
 
   assert (s != s_cuda_stream_reducers.end());
@@ -311,6 +362,7 @@ void releaseCudaReductionId(int id)
 */
 void getCudaReductionMemBlock(int id, void** device_memblock)
 {
+
   auto s = s_cuda_stream_reducers.find(getStream());
   
   assert (s != s_cuda_stream_reducers.end());
@@ -338,6 +390,7 @@ bool getCudaReductionTallyBlock_impl(
         int id, void** host_tally, void** device_tally, 
         CudaReductionDummyDataType** init_device_value)
 {
+
   auto s = s_cuda_stream_reducers.find(getStream());
 
   assert (s != s_cuda_stream_reducers.end());
@@ -395,6 +448,7 @@ bool getCudaReductionTallyBlock_impl(
 */
 static void writeBackCudaReductionTallyBlock()
 {
+
   auto s = s_cuda_stream_reducers.find(getStream());
     
   assert (s != s_cuda_stream_reducers.end());
@@ -440,6 +494,7 @@ static void writeBackCudaReductionTallyBlock()
 */
 static void readCudaReductionTallyBlockAsync()
 {
+  
   auto s = s_cuda_stream_reducers.find(getStream());
     
   assert (s != s_cuda_stream_reducers.end());
@@ -456,16 +511,19 @@ static void readCudaReductionTallyBlockAsync()
 }
 static void readCudaReductionTallyBlock()
 {
+  
   auto s = s_cuda_stream_reducers.find(getStream());
     
   assert (s != s_cuda_stream_reducers.end());
   
   if (!s->second.tally_valid) {
-    cudaErrchk(cudaMemcpy(  &s->second.tally_block_host[0],
-                            &s->second.tally_block_device[0],
-                            sizeof(CudaReductionDummyTallyType) *
-                              RAJA_CUDA_REDUCE_TALLY_LENGTH,
-                            cudaMemcpyDeviceToHost));
+    cudaErrchk(cudaMemcpyAsync( &s->second.tally_block_host[0],
+                                &s->second.tally_block_device[0],
+                                sizeof(CudaReductionDummyTallyType) *
+                                  RAJA_CUDA_REDUCE_TALLY_LENGTH,
+                                cudaMemcpyDeviceToHost,
+                                getStream()));
+    cudaErrchk(cudaStreamSynchronize(getStream()));
     s->second.tally_valid = true;
   }
 }
@@ -482,6 +540,7 @@ static void readCudaReductionTallyBlock()
 */
 void beforeCudaKernelLaunch()
 {
+  
   auto s = s_cuda_stream_reducers.find(getStream());
     
   assert (s != s_cuda_stream_reducers.end());
@@ -506,6 +565,7 @@ void beforeCudaKernelLaunch()
 */
 void afterCudaKernelLaunch()
 {
+  
   auto s = s_cuda_stream_reducers.find(getStream());
     
   assert (s != s_cuda_stream_reducers.end());
@@ -529,6 +589,7 @@ void afterCudaKernelLaunch()
 */
 CudaReductionDummyDataType* beforeCudaReadTallyBlockAsync(int id)
 {
+  
   auto s = s_cuda_stream_reducers.find(getStream());
     
   assert (s != s_cuda_stream_reducers.end());
@@ -546,6 +607,7 @@ CudaReductionDummyDataType* beforeCudaReadTallyBlockAsync(int id)
 ///
 CudaReductionDummyDataType* beforeCudaReadTallyBlockSync(int id)
 {
+  
   auto s = s_cuda_stream_reducers.find(getStream());
     
   assert (s != s_cuda_stream_reducers.end());
@@ -570,6 +632,7 @@ CudaReductionDummyDataType* beforeCudaReadTallyBlockSync(int id)
 */
 void releaseCudaReductionTallyBlock(int id)
 {
+  
   auto s = s_cuda_stream_reducers.find(getStream());
     
   assert (s != s_cuda_stream_reducers.end());
@@ -593,6 +656,7 @@ void releaseCudaReductionTallyBlock(int id)
 */
 int getCudaSharedmemOffset(int id, dim3 reductionBlockDim, int size)
 {
+  
   auto s = s_cuda_stream_reducers.find(getStream());
     
   assert (s != s_cuda_stream_reducers.end());
@@ -630,6 +694,7 @@ int getCudaSharedmemOffset(int id, dim3 reductionBlockDim, int size)
 */
 int getCudaSharedmemAmount(dim3 launchGridDim, dim3 launchBlockDim)
 {
+  
   auto s = s_cuda_stream_reducers.find(getStream());
     
   assert (s != s_cuda_stream_reducers.end());
