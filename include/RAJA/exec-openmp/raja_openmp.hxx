@@ -81,23 +81,19 @@ namespace RAJA
 ///
 template <typename InnerPolicy>
 struct omp_parallel_exec {
-  constexpr const static bool is_cuda_policy = false;
 };
 struct omp_for_exec {
-  constexpr const static bool is_cuda_policy = false;
 };
 struct omp_parallel_for_exec : public omp_parallel_exec<omp_for_exec> {
 };
 template <size_t ChunkSize>
 struct omp_for_static {
-  constexpr const static bool is_cuda_policy = false;
 };
 template <size_t ChunkSize>
 struct omp_parallel_for_static
     : public omp_parallel_exec<omp_for_static<ChunkSize>> {
 };
 struct omp_for_nowait_exec {
-  constexpr const static bool is_cuda_policy = false;
 };
 
 ///

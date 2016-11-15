@@ -70,7 +70,6 @@ namespace RAJA
 {
 
 struct simd_exec {
-  constexpr const static bool is_cuda_policy = false;
 };
 }
 

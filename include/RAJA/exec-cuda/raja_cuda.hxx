@@ -63,8 +63,8 @@
 #include <cuda_runtime.h>
 
 #include "RAJA/reducers.hxx"
- 
 #include "RAJA/int_datatypes.hxx"
+#include "RAJA/exec-cuda/raja_cudaerrchk.hxx"
 
 namespace RAJA
 {
@@ -124,15 +124,9 @@ struct Dim3z {
 ///
 /// Segment execution policies
 ///
-
-struct cuda_exec_base {
-  constexpr const static bool is_cuda_policy = true;
-};
-
 template <size_t BLOCK_SIZE, bool Async = false>
 struct cuda_exec : public cuda_exec_base {
 };
-
 ///
 template <size_t BLOCK_SIZE>
 using cuda_exec_async = cuda_exec<BLOCK_SIZE, true>;

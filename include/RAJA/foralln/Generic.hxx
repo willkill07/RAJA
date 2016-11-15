@@ -56,8 +56,11 @@
 #include "RAJA/LegacyCompatibility.hxx"
 
 #ifdef RAJA_ENABLE_CUDA
+#include "RAJA/exec-cuda/raja_cudaerrchk.hxx"
 #include "RAJA/exec-cuda/MemUtils_CUDA.hxx"
 #endif
+
+#include <type_traits>
 
 namespace RAJA
 {
@@ -75,23 +78,30 @@ struct ForallN_PolicyPair : public I {
   explicit constexpr ForallN_PolicyPair(ISET const &i) : ISET(i) {}
 };
 
-template <typename T>
-constexpr bool is_cuda_policy(T&&)
-{
-  return false;
-}
+
+template <typename... PLIST>
+struct has_cuda_loop;
+
+#ifdef RAJA_ENABLE_CUDA
 
 template <typename P0>
-constexpr inline bool has_cuda_loop()
+struct has_cuda_loop<P0>
 {
-  return P0::is_cuda_policy;
-}
+  const static bool value = std::is_base_of<cuda_exec_base, P0>::value;
+};
 
 template <typename P0, typename P1, typename... PLIST>
-constexpr inline bool has_cuda_loop()
+struct has_cuda_loop<P0, P1, PLIST...>
 {
-  return P0::is_cuda_policy || has_cuda_loop<P1, PLIST...>();
-}
+  const static bool value = std::is_base_of<cuda_exec_base, P0>::value || has_cuda_loop<P1, PLIST...>::value;
+};
+#else
+template <typename... PLIST>
+struct has_cuda_loop
+{
+  const static bool value = false;
+};
+#endif
 
 template <typename... PLIST>
 struct ExecList {
@@ -297,19 +307,18 @@ struct ForallN_IndexTypeConverter_reference {
     body(Idx(arg)...);
   }
 
-// This fixes massive compile time slowness for clang sans OpenMP
-// using a reference to body breaks offload for CUDA
+  // This fixes massive compile time slowness for clang sans OpenMP
   BODY const &body;
 };
 ///
 template <typename BODY_in, typename... Idx>
-struct ForallN_IndexTypeConverter_copy {
+struct ForallN_IndexTypeConverter_value {
   using BODY = typename std::remove_reference<BODY_in>::type;
 
   RAJA_SUPPRESS_HD_WARN
   RAJA_INLINE
   RAJA_HOST_DEVICE
-  constexpr explicit ForallN_IndexTypeConverter_copy(BODY const &b) : body(b) {}
+  constexpr explicit ForallN_IndexTypeConverter_value(BODY const &b) : body(b) {}
 
   // call 'policy' layer with next policy
   RAJA_SUPPRESS_HD_WARN
@@ -319,19 +328,21 @@ struct ForallN_IndexTypeConverter_copy {
     body(Idx(arg)...);
   }
 
-// This fixes massive compile time slowness for clang sans OpenMP
-// using a reference to body breaks offload for CUDA
+  // using a reference to body breaks offload for CUDA
   BODY body;
 };
 
+#if defined(RAJA_ENABLE_CUDA)
 template <typename POLICY,
           typename... Indices,
           typename... ExecPolicies,
           typename BODY,
           typename... Ts>
-RAJA_INLINE void forallN_impl_extract(RAJA::ExecList<ExecPolicies...>,
-                                      BODY &&body,
-                                      const Ts &... args)
+RAJA_INLINE
+typename std::enable_if<has_cuda_loop<ExecPolicies...>::value>::type
+forallN_impl_extract(RAJA::ExecList<ExecPolicies...>,
+                     BODY &&body,
+                     const Ts &... args)
 {
   static_assert(sizeof...(ExecPolicies) == sizeof...(args),
                 "The number of execution policies and arguments does not "
@@ -340,35 +351,49 @@ RAJA_INLINE void forallN_impl_extract(RAJA::ExecList<ExecPolicies...>,
   typedef typename POLICY::NextPolicy NextPolicy;
   typedef typename POLICY::NextPolicy::PolicyTag NextPolicyTag;
 
-  if (has_cuda_loop<ExecPolicies...>()) {
-#ifdef RAJA_ENABLE_CUDA
-    // this call should be moved into a cuda file
-    // but must be made before loop_body is copied
-    beforeCudaKernelLaunch();
+  // Create index type conversion layer
+  typedef ForallN_IndexTypeConverter_value<BODY, Indices...> IDX_CONV;
+
+  // this call should be moved into a cuda file
+  // but must be made before loop_body is copied in IDX_CONV
+  beforeCudaKernelLaunch();
+
+  // call policy layer with next policy
+  forallN_policy<NextPolicy, IDX_CONV>(NextPolicyTag(),
+                                       IDX_CONV(body),
+                                       ForallN_PolicyPair<ExecPolicies, Ts>(
+                                           args)...);
+
+  afterCudaKernelLaunch();
+}
 #endif
 
-    // Create index type conversion layer
-    typedef ForallN_IndexTypeConverter_copy<BODY, Indices...> IDX_CONV;
+template <typename POLICY,
+          typename... Indices,
+          typename... ExecPolicies,
+          typename BODY,
+          typename... Ts>
+RAJA_INLINE
+typename std::enable_if<!has_cuda_loop<ExecPolicies...>::value>::type
+forallN_impl_extract(RAJA::ExecList<ExecPolicies...>,
+                     BODY &&body,
+                     const Ts &... args)
+{
+  static_assert(sizeof...(ExecPolicies) == sizeof...(args),
+                "The number of execution policies and arguments does not "
+                "match");
+  // extract next policy
+  typedef typename POLICY::NextPolicy NextPolicy;
+  typedef typename POLICY::NextPolicy::PolicyTag NextPolicyTag;
 
-    // call policy layer with next policy
-    forallN_policy<NextPolicy, IDX_CONV>(NextPolicyTag(),
-                                         IDX_CONV(body),
-                                         ForallN_PolicyPair<ExecPolicies, Ts>(
-                                             args)...);
+  // Create index type conversion layer
+  typedef ForallN_IndexTypeConverter_reference<BODY, Indices...> IDX_CONV;
 
-#ifdef RAJA_ENABLE_CUDA
-    afterCudaKernelLaunch();
-#endif
-  } else {
-    // Create index type conversion layer
-    typedef ForallN_IndexTypeConverter_reference<BODY, Indices...> IDX_CONV;
-
-    // call policy layer with next policy
-    forallN_policy<NextPolicy, IDX_CONV>(NextPolicyTag(),
-                                         IDX_CONV(body),
-                                         ForallN_PolicyPair<ExecPolicies, Ts>(
-                                             args)...);
-  }
+  // call policy layer with next policy
+  forallN_policy<NextPolicy, IDX_CONV>(NextPolicyTag(),
+                                       IDX_CONV(body),
+                                       ForallN_PolicyPair<ExecPolicies, Ts>(
+                                           args)...);
 }
 
 template <typename T, typename T2>

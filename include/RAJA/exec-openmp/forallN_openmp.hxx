@@ -86,7 +86,6 @@ struct OMP_Parallel {
  ******************************************************************/
 
 struct omp_collapse_nowait_exec {
-  constexpr const static bool is_cuda_policy = false;
 };
 
 template <typename... PREST>

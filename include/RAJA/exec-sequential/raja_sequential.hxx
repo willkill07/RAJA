@@ -72,7 +72,6 @@ namespace RAJA
 /// Segment execution policies
 ///
 struct seq_exec : public PolicyBase {
-  constexpr const static bool is_cuda_policy = false;
 };
 
 ///

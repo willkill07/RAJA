@@ -115,8 +115,7 @@ struct CudaDim {
 };
 
 template <typename POL>
-struct CudaPolicy {
-  constexpr const static bool is_cuda_policy = true;
+struct CudaPolicy : public cuda_exec_base {
 };
 
 template <typename POL, typename IDX>
