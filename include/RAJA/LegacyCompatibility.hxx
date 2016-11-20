@@ -62,6 +62,12 @@ struct remove_reference<T&&> {
   typedef T type;
 };
 template <class T>
+RAJA_HOST_DEVICE RAJA_INLINE constexpr typename remove_reference<T>::type&& move(
+    T&& t) noexcept
+{
+  return static_cast<typename remove_reference<T>::type&&>(t);
+}
+template <class T>
 RAJA_HOST_DEVICE RAJA_INLINE constexpr T&& forward(
     typename remove_reference<T>::type& t) noexcept
 {
@@ -141,7 +147,7 @@ RAJA_HOST_DEVICE RAJA_INLINE constexpr auto foldl(Op&& operation,
 struct adder {
   template <typename Result>
   RAJA_HOST_DEVICE RAJA_INLINE constexpr Result operator()(const Result& l,
-                                                           const Result& r)
+                                                           const Result& r) const noexcept(noexcept(l+r))
   {
     return l + r;
   }

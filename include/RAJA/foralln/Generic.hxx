@@ -76,6 +76,9 @@ struct ForallN_PolicyPair : public I {
 
   RAJA_INLINE
   explicit constexpr ForallN_PolicyPair(ISET const &i) : ISET(i) {}
+
+  RAJA_INLINE
+  explicit constexpr ForallN_PolicyPair(ISET&& i) : ISET(VarOps::move(i)) {}
 };
 
 
@@ -227,12 +230,12 @@ struct ForallN_Executor<POLICY_INIT, POLICY_REST...> {
 
   typedef ForallN_Executor<POLICY_REST...> NextExec;
 
-  POLICY_INIT const is_i;
+  POLICY_INIT const is_init;
   NextExec const next_exec;
 
   template <typename... TYPE_REST>
-  constexpr ForallN_Executor(POLICY_INIT const &is_i0, TYPE_REST const &... is_rest)
-      : is_i(is_i0), next_exec(is_rest...)
+  constexpr ForallN_Executor(POLICY_INIT const &is_init0, TYPE_REST const &... is_rest)
+      : is_init(is_init0), next_exec(is_rest...)
   {
   }
 
@@ -240,7 +243,7 @@ struct ForallN_Executor<POLICY_INIT, POLICY_REST...> {
   RAJA_INLINE void operator()(BODY const &body) const
   {
     ForallN_PeelOuter<NextExec, BODY> outer(next_exec, body);
-    RAJA::forall<POLICY_I>(is_i, outer);
+    RAJA::forall<POLICY_I>(is_init, outer);
   }
 };
 
@@ -294,15 +297,12 @@ template <typename BODY_in, typename... Idx>
 struct ForallN_IndexTypeConverter_reference {
   using BODY = typename std::remove_reference<BODY_in>::type;
 
-  RAJA_SUPPRESS_HD_WARN
   RAJA_INLINE
-  RAJA_HOST_DEVICE
   constexpr explicit ForallN_IndexTypeConverter_reference(BODY const &b) : body(b) {}
 
   // call 'policy' layer with next policy
-  RAJA_SUPPRESS_HD_WARN
   template <typename... ARGS>
-  RAJA_INLINE RAJA_HOST_DEVICE void operator()(ARGS... arg) const
+  RAJA_INLINE void operator()(ARGS... arg) const
   {
     body(Idx(arg)...);
   }
@@ -341,8 +341,8 @@ template <typename POLICY,
 RAJA_INLINE
 typename std::enable_if<has_cuda_loop<ExecPolicies...>::value>::type
 forallN_impl_extract(RAJA::ExecList<ExecPolicies...>,
-                     BODY &&body,
-                     const Ts &... args)
+                     BODY&& body,
+                     Ts&&... args)
 {
   static_assert(sizeof...(ExecPolicies) == sizeof...(args),
                 "The number of execution policies and arguments does not "
@@ -360,9 +360,9 @@ forallN_impl_extract(RAJA::ExecList<ExecPolicies...>,
 
   // call policy layer with next policy
   forallN_policy<NextPolicy, IDX_CONV>(NextPolicyTag(),
-                                       IDX_CONV(body),
-                                       ForallN_PolicyPair<ExecPolicies, Ts>(
-                                           args)...);
+                                       IDX_CONV(VarOps::forward<BODY>(body)),
+                                       ForallN_PolicyPair<ExecPolicies, typename VarOps::remove_reference<Ts>::type>(
+                                           VarOps::forward<Ts>(args))...);
 
   afterCudaKernelLaunch();
 }
@@ -376,8 +376,8 @@ template <typename POLICY,
 RAJA_INLINE
 typename std::enable_if<!has_cuda_loop<ExecPolicies...>::value>::type
 forallN_impl_extract(RAJA::ExecList<ExecPolicies...>,
-                     BODY &&body,
-                     const Ts &... args)
+                     BODY&& body,
+                     Ts&&... args)
 {
   static_assert(sizeof...(ExecPolicies) == sizeof...(args),
                 "The number of execution policies and arguments does not "
@@ -391,9 +391,9 @@ forallN_impl_extract(RAJA::ExecList<ExecPolicies...>,
 
   // call policy layer with next policy
   forallN_policy<NextPolicy, IDX_CONV>(NextPolicyTag(),
-                                       IDX_CONV(body),
-                                       ForallN_PolicyPair<ExecPolicies, Ts>(
-                                           args)...);
+                                       IDX_CONV(VarOps::forward<BODY>(body)),
+                                       ForallN_PolicyPair<ExecPolicies, typename VarOps::remove_reference<Ts>::type>(
+                                           VarOps::forward<Ts>(args))...);
 }
 
 template <typename T, typename T2>
@@ -411,7 +411,7 @@ template <typename POLICY,
 RAJA_INLINE void forallN_impl(VarOps::index_sequence<Range...>,
                               VarOps::index_sequence<Unspecified...>,
                               BODY &&body,
-                              const Ts &... args)
+                              Ts&&... args)
 {
   static_assert(sizeof...(Indices) <= sizeof...(args),
                 "More index types have been specified than arguments, one of "
@@ -420,7 +420,7 @@ RAJA_INLINE void forallN_impl(VarOps::index_sequence<Range...>,
   forallN_impl_extract<POLICY,
                        Indices...,
                        decltype(return_first((Index_type)0, Unspecified))...>(
-      typename POLICY::ExecPolicies(), body, args...);
+      typename POLICY::ExecPolicies(), VarOps::forward<BODY>(body), VarOps::forward<Ts>(args)...);
 }
 
 template <typename POLICY,
