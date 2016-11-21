@@ -87,10 +87,12 @@ struct ForallN_Permute_Functor_impl<VarOps::index_sequence<Range...>,
                                     BODY> {
   RAJA_INLINE
   constexpr explicit ForallN_Permute_Functor_impl(BODY const &b) : body(b) {}
+  RAJA_INLINE
+  constexpr explicit ForallN_Permute_Functor_impl(BODY&& b) : body(VarOps::move(b)) {}
 
   RAJA_SUPPRESS_HD_WARN
   template <typename... Indices>
-  RAJA_INLINE RAJA_HOST_DEVICE void operator()(Indices... indices) const
+  RAJA_INLINE RAJA_HOST_DEVICE void operator()(Indices... indices)
   {
     constexpr size_t perms[] = {
         VarOps::get_offset<Range, PermInts...>::value...};
@@ -98,10 +100,10 @@ struct ForallN_Permute_Functor_impl<VarOps::index_sequence<Range...>,
   }
 
   template <typename NextPolicy, typename TAG, typename... Ps>
-  RAJA_INLINE void callNextPolicy(const Ps &... ps) const
+  RAJA_INLINE void callNextPolicy(const Ps &... ps)
   {
-    forallN_policy<NextPolicy>(TAG(),
-                               *this,
+    forallN_policy<NextPolicy, typename VarOps::remove_reference<decltype(*this)>::type>(TAG(),
+                               VarOps::move(*this),
                                VarOps::get_arg_at<PermInts>::value(ps...)...);
   }
 
@@ -117,7 +119,7 @@ using ForallN_Permute_Functor =
  * \brief Permutation policy function, providing loop interchange.
  */
 template <typename POLICY, typename BODY, typename... ARGS>
-RAJA_INLINE void forallN_policy(ForallN_Permute_Tag, BODY body, ARGS... args)
+RAJA_INLINE void forallN_policy(ForallN_Permute_Tag, BODY&& body, ARGS... args)
 {
   // Get the loop permutation
   typedef typename POLICY::LoopOrder LoopOrder;
@@ -127,8 +129,8 @@ RAJA_INLINE void forallN_policy(ForallN_Permute_Tag, BODY body, ARGS... args)
   typedef typename POLICY::NextPolicy::PolicyTag NextPolicyTag;
 
   // Create wrapper functor that permutes indices and policies
-  typedef ForallN_Permute_Functor<LoopOrder, BODY> PERM_FUNC;
-  PERM_FUNC perm_func(body);
+  typedef ForallN_Permute_Functor<LoopOrder, typename VarOps::remove_reference<BODY>::type> PERM_FUNC;
+  PERM_FUNC perm_func(VarOps::forward<BODY>(body));
 
   // Use the wrapper to call the next policy
   perm_func.template callNextPolicy<NextPolicy, NextPolicyTag>(args...);

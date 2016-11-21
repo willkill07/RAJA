@@ -78,7 +78,7 @@ namespace RAJA
  */
 template <typename BODY>
 struct ForallN_BindFirstArg_Device {
-  BODY const &body;
+  BODY &body;
   size_t i;
 
   RAJA_INLINE
@@ -86,7 +86,7 @@ struct ForallN_BindFirstArg_Device {
   constexpr ForallN_BindFirstArg_Device(BODY &b, size_t i0) : body(b), i(i0) {}
 
   template <typename... ARGS>
-  RAJA_INLINE RAJA_DEVICE void operator()(ARGS... args) const
+  RAJA_INLINE RAJA_DEVICE void operator()(ARGS... args)
   {
     body(i, args...);
   }
@@ -360,18 +360,18 @@ struct ForallN_Executor<ForallN_PolicyPair<CudaPolicy<CuARG0>, ISET0>,
   }
 
   template <typename BODY>
-  RAJA_INLINE void operator()(BODY body) const
+  RAJA_INLINE void operator()(BODY&& body)
   {
-    unpackIndexSets(body, typename gen_sequence<sizeof...(CuARGS)>::type());
+    unpackIndexSets(VarOps::forward<BODY>(body), typename gen_sequence<sizeof...(CuARGS)>::type());
   }
 
   template <typename BODY, int... N>
-  RAJA_INLINE void unpackIndexSets(BODY body, integer_sequence<N...>) const
+  RAJA_INLINE void unpackIndexSets(BODY&& body, integer_sequence<N...>)
   {
     CudaDim dims;
 
     callLauncher(dims,
-                 body,
+                 VarOps::forward<BODY>(body),
                  CuARG0(dims, iset0),
                  CuARG1(dims, iset1),
                  CuARGS(dims, std::get<N>(isets))...);
@@ -379,12 +379,12 @@ struct ForallN_Executor<ForallN_PolicyPair<CudaPolicy<CuARG0>, ISET0>,
 
   template <typename BODY, typename... CARGS>
   RAJA_INLINE void callLauncher(CudaDim const &dims,
-                                BODY body,
-                                CARGS const &... cargs) const
+                                BODY&& body,
+                                CARGS const &... cargs)
   {
-
-    cudaLauncherN<<<RAJA_CUDA_LAUNCH_PARAMS(dims.num_blocks, dims.num_threads)
-                 >>>(body, cargs...);
+    cudaLauncherN<typename VarOps::remove_reference<BODY>::type>
+                 <<<RAJA_CUDA_LAUNCH_PARAMS(dims.num_blocks, dims.num_threads)
+                 >>>(VarOps::move(body), cargs...);
                  
     RAJA_CUDA_CHECK_AND_SYNC(true);
   }
@@ -400,13 +400,14 @@ struct ForallN_Executor<ForallN_PolicyPair<CudaPolicy<CuARG0>, ISET0>> {
   }
 
   template <typename BODY>
-  RAJA_INLINE void operator()(BODY body) const
+  RAJA_INLINE void operator()(BODY&& body)
   {
     CudaDim dims;
     CuARG0 c0(dims, iset0);
 
-    cudaLauncherN<<<RAJA_CUDA_LAUNCH_PARAMS(dims.num_blocks, dims.num_threads)
-                 >>>(body, c0);
+    cudaLauncherN<typename VarOps::remove_reference<BODY>::type>
+                 <<<RAJA_CUDA_LAUNCH_PARAMS(dims.num_blocks, dims.num_threads)
+                 >>>(VarOps::move(body), c0);
 
     RAJA_CUDA_CHECK_AND_SYNC(true);
   }

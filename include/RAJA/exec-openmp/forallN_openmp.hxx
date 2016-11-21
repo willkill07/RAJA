@@ -110,14 +110,14 @@ struct ForallN_Executor<ForallN_PolicyPair<omp_collapse_nowait_exec,
   }
 
   template <typename BODY>
-  RAJA_INLINE void operator()(BODY body) const
+  RAJA_INLINE void operator()(BODY&& body)
   {
     int begin_i = iset_i.getBegin();
     int begin_j = iset_j.getBegin();
     int end_i = iset_i.getEnd();
     int end_j = iset_j.getEnd();
 
-    ForallN_PeelOuter<NextExec, BODY> outer(next_exec, body);
+    ForallN_PeelOuter<NextExec, typename VarOps::remove_reference<BODY>::type> outer(next_exec, VarOps::forward<BODY>(body));
 
 #pragma omp for nowait collapse(2)
     for (int i = begin_i; i < end_i; ++i) {
@@ -154,7 +154,7 @@ struct ForallN_Executor<ForallN_PolicyPair<omp_collapse_nowait_exec,
   }
 
   template <typename BODY>
-  RAJA_INLINE void operator()(BODY body) const
+  RAJA_INLINE void operator()(BODY&& body)
   {
     int begin_i = iset_i.getBegin();
     int begin_j = iset_j.getBegin();
@@ -163,7 +163,7 @@ struct ForallN_Executor<ForallN_PolicyPair<omp_collapse_nowait_exec,
     int end_j = iset_j.getEnd();
     int end_k = iset_k.getEnd();
 
-    ForallN_PeelOuter<NextExec, BODY> outer(next_exec, body);
+    ForallN_PeelOuter<NextExec, typename VarOps::remove_reference<BODY>::type> outer(next_exec, VarOps::forward<BODY>(body));
 
 #pragma omp for nowait collapse(3)
     for (int i = begin_i; i < end_i; ++i) {

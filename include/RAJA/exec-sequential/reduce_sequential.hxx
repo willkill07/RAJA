@@ -134,7 +134,7 @@ public:
   //
   // Method that updates min value.
   //
-  ReduceMin<seq_reduce, T> min(T val) const
+  ReduceMin<seq_reduce, T> const& min(T val) const
   {
     m_blockdata[0] = RAJA_MIN(static_cast<T>(m_blockdata[0]), val);
     return *this;
@@ -237,7 +237,7 @@ public:
   //
   // Method that updates min and index values.
   //
-  ReduceMinLoc<seq_reduce, T> minloc(T val, Index_type idx) const
+  ReduceMinLoc<seq_reduce, T> const& minloc(T val, Index_type idx) const
   {
     if (val <= static_cast<T>(m_blockdata[0])) {
       m_blockdata[0] = val;
@@ -329,7 +329,7 @@ public:
   //
   // Method that updates max value.
   //
-  ReduceMax<seq_reduce, T> max(T val) const
+  ReduceMax<seq_reduce, T> const& max(T val) const
   {
     m_blockdata[0] = RAJA_MAX(static_cast<T>(m_blockdata[0]), val);
     return *this;
@@ -432,7 +432,7 @@ public:
   //
   // Method that updates max and index values.
   //
-  ReduceMaxLoc<seq_reduce, T> maxloc(T val, Index_type idx) const
+  ReduceMaxLoc<seq_reduce, T> const& maxloc(T val, Index_type idx) const
   {
     if (val >= static_cast<T>(m_blockdata[0])) {
       m_blockdata[0] = val;
@@ -525,7 +525,7 @@ public:
   //
   // += operator that adds value to sum.
   //
-  ReduceSum<seq_reduce, T> operator+=(T val) const
+  ReduceSum<seq_reduce, T> const& operator+=(T val) const
   {
     m_blockdata[0] += val;
     return *this;

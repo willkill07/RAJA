@@ -137,18 +137,24 @@ struct NestedPolicy {
  */
 template <typename BODY, typename INDEX_TYPE = Index_type>
 struct ForallN_BindFirstArg_HostDevice {
-  BODY const body;
+  BODY body;
   INDEX_TYPE const i;
 
   RAJA_INLINE
-  constexpr ForallN_BindFirstArg_HostDevice(BODY b, INDEX_TYPE i0)
+  constexpr ForallN_BindFirstArg_HostDevice(BODY const& b, INDEX_TYPE i0)
       : body(b), i(i0)
+  {
+  }
+
+  RAJA_INLINE
+  constexpr ForallN_BindFirstArg_HostDevice(BODY&& b, INDEX_TYPE i0)
+      : body(VarOps::move(b)), i(i0)
   {
   }
 
   RAJA_SUPPRESS_HD_WARN
   template <typename... ARGS>
-  RAJA_INLINE RAJA_HOST_DEVICE void operator()(ARGS... args) const
+  RAJA_INLINE RAJA_HOST_DEVICE void operator()(ARGS... args)
   {
     body(i, args...);
   }
@@ -161,7 +167,7 @@ struct ForallN_BindFirstArg_HostDevice {
  */
 template <typename BODY, typename INDEX_TYPE = Index_type>
 struct ForallN_BindFirstArg_Host {
-  BODY const body;
+  BODY body;
   INDEX_TYPE const i;
 
   RAJA_INLINE
@@ -170,8 +176,14 @@ struct ForallN_BindFirstArg_Host {
   {
   }
 
+  RAJA_INLINE
+  constexpr ForallN_BindFirstArg_Host(BODY&& b, INDEX_TYPE i0)
+      : body(VarOps::move(b)), i(i0)
+  {
+  }
+
   template <typename... ARGS>
-  RAJA_INLINE void operator()(ARGS... args) const
+  RAJA_INLINE void operator()(ARGS... args)
   {
     body(i, args...);
   }
@@ -179,8 +191,8 @@ struct ForallN_BindFirstArg_Host {
 
 template <typename NextExec, typename BODY>
 struct ForallN_PeelOuter {
-  NextExec const next_exec;
-  BODY const body;
+  NextExec next_exec;
+  BODY body;
 
   RAJA_INLINE
   constexpr ForallN_PeelOuter(NextExec const &ne, BODY const &b)
@@ -189,27 +201,33 @@ struct ForallN_PeelOuter {
   }
 
   RAJA_INLINE
-  void operator()(Index_type i) const
+  constexpr ForallN_PeelOuter(NextExec const &ne, BODY&& b)
+      : next_exec(ne), body(VarOps::move(b))
+  {
+  }
+
+  RAJA_INLINE
+  void operator()(Index_type i)
   {
     ForallN_BindFirstArg_HostDevice<BODY> inner(body, i);
-    next_exec(inner);
+    next_exec(VarOps::move(inner));
   }
 
   RAJA_INLINE
-  void operator()(Index_type i, Index_type j) const
+  void operator()(Index_type i, Index_type j)
   {
     ForallN_BindFirstArg_HostDevice<BODY> inner_i(body, i);
-    ForallN_BindFirstArg_HostDevice<decltype(inner_i)> inner_j(inner_i, j);
-    next_exec(inner_j);
+    ForallN_BindFirstArg_HostDevice<decltype(inner_i)> inner_j(VarOps::move(inner_i), j);
+    next_exec(VarOps::move(inner_j));
   }
 
   RAJA_INLINE
-  void operator()(Index_type i, Index_type j, Index_type k) const
+  void operator()(Index_type i, Index_type j, Index_type k)
   {
     ForallN_BindFirstArg_HostDevice<BODY> inner_i(body, i);
-    ForallN_BindFirstArg_HostDevice<decltype(inner_i)> inner_j(inner_i, j);
-    ForallN_BindFirstArg_HostDevice<decltype(inner_j)> inner_k(inner_j, k);
-    next_exec(inner_k);
+    ForallN_BindFirstArg_HostDevice<decltype(inner_i)> inner_j(VarOps::move(inner_i), j);
+    ForallN_BindFirstArg_HostDevice<decltype(inner_j)> inner_k(VarOps::move(inner_j), k);
+    next_exec(VarOps::move(inner_k));
   }
 };
 
@@ -240,10 +258,10 @@ struct ForallN_Executor<POLICY_INIT, POLICY_REST...> {
   }
 
   template <typename BODY>
-  RAJA_INLINE void operator()(BODY const &body) const
+  RAJA_INLINE void operator()(BODY&& body)
   {
-    ForallN_PeelOuter<NextExec, BODY> outer(next_exec, body);
-    RAJA::forall<POLICY_I>(is_init, outer);
+    ForallN_PeelOuter<NextExec, typename VarOps::remove_reference<BODY>::type> outer(next_exec, VarOps::forward<BODY>(body));
+    RAJA::forall<POLICY_I>(is_init, VarOps::move(outer));
   }
 };
 
@@ -255,7 +273,7 @@ struct ForallN_Executor<> {
   constexpr ForallN_Executor() {}
 
   template <typename BODY>
-  RAJA_INLINE void operator()(BODY const &body) const
+  RAJA_INLINE void operator()(BODY&& body)
   {
     body();
   }
@@ -273,14 +291,14 @@ struct ForallN_Executor<> {
 
 template <typename POLICY, typename BODY, typename... ARGS>
 RAJA_INLINE void forallN_policy(ForallN_Execute_Tag,
-                                BODY const &body,
-                                ARGS const &... args)
+                                BODY&& body,
+                                ARGS... args)
 {
   // Create executor object to launch loops
   ForallN_Executor<ARGS...> exec(args...);
 
   // Launch loop body
-  exec(body);
+  exec(VarOps::forward<BODY>(body));
 }
 
 /******************************************************************
@@ -359,10 +377,10 @@ forallN_impl_extract(RAJA::ExecList<ExecPolicies...>,
   beforeCudaKernelLaunch();
 
   // call policy layer with next policy
-  forallN_policy<NextPolicy, IDX_CONV>(NextPolicyTag(),
-                                       IDX_CONV(VarOps::forward<BODY>(body)),
-                                       ForallN_PolicyPair<ExecPolicies, typename VarOps::remove_reference<Ts>::type>(
-                                           VarOps::forward<Ts>(args))...);
+  forallN_policy<NextPolicy>(NextPolicyTag(),
+                             IDX_CONV(VarOps::forward<BODY>(body)),
+                             ForallN_PolicyPair<ExecPolicies, typename VarOps::remove_reference<Ts>::type>(
+                                VarOps::forward<Ts>(args))...);
 
   afterCudaKernelLaunch();
 }
@@ -390,10 +408,10 @@ forallN_impl_extract(RAJA::ExecList<ExecPolicies...>,
   typedef ForallN_IndexTypeConverter_reference<BODY, Indices...> IDX_CONV;
 
   // call policy layer with next policy
-  forallN_policy<NextPolicy, IDX_CONV>(NextPolicyTag(),
-                                       IDX_CONV(VarOps::forward<BODY>(body)),
-                                       ForallN_PolicyPair<ExecPolicies, typename VarOps::remove_reference<Ts>::type>(
-                                           VarOps::forward<Ts>(args))...);
+  forallN_policy<NextPolicy>(NextPolicyTag(),
+                             IDX_CONV(VarOps::forward<BODY>(body)),
+                             ForallN_PolicyPair<ExecPolicies, typename VarOps::remove_reference<Ts>::type>(
+                                VarOps::forward<Ts>(args))...);
 }
 
 template <typename T, typename T2>

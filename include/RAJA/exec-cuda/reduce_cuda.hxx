@@ -179,6 +179,21 @@ public:
     m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
 #endif
   }
+  ///
+  __host__ __device__
+  ReduceMin(const ReduceMin<cuda_reduce<BLOCK_SIZE, Async>, T> &&other)
+  {
+    *this = other;
+#if defined(__CUDA_ARCH__)
+    // m_is_copy_device = true;
+    // m_finish_reduction = !other.m_is_copy_device;
+#else
+    m_is_copy_host = true;
+#endif
+  }
+
+  __host__ __device__
+  ReduceMin<cuda_reduce<BLOCK_SIZE, Async>, T> & operator=(const ReduceMin<cuda_reduce<BLOCK_SIZE, Async>, T> &other) = default;
 
   /*!
    * \brief Finish reduction on device and free memory on host.
@@ -382,6 +397,21 @@ public:
     m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
 #endif
   }
+
+  __host__ __device__
+  ReduceMax(const ReduceMax<cuda_reduce<BLOCK_SIZE, Async>, T> &&other)
+  {
+    *this = other;
+#if defined(__CUDA_ARCH__)
+    // m_is_copy_device = true;
+    // m_finish_reduction = !other.m_is_copy_device;
+#else
+    m_is_copy_host = true;
+#endif
+  }
+
+  __host__ __device__
+  ReduceMax<cuda_reduce<BLOCK_SIZE, Async>, T> & operator=(const ReduceMax<cuda_reduce<BLOCK_SIZE, Async>, T> &other) = default;
 
   /*!
    * \brief Finish reduction on device and free memory on host.
@@ -588,6 +618,21 @@ public:
     m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
 #endif
   }
+  ///
+  __host__ __device__
+  ReduceSum(const ReduceSum<cuda_reduce<BLOCK_SIZE, Async>, T> &&other)
+  {
+    *this = other;
+#if defined(__CUDA_ARCH__)
+    // m_is_copy_device = true;
+    // m_finish_reduction = !other.m_is_copy_device;
+#else
+    m_is_copy_host = true;
+#endif
+  }
+
+  __host__ __device__
+  ReduceSum<cuda_reduce<BLOCK_SIZE, Async>, T> & operator=(const ReduceSum<cuda_reduce<BLOCK_SIZE, Async>, T> &other) = default;
 
   /*!
    * \brief Finish reduction on device and free memory on host.
@@ -849,6 +894,21 @@ public:
     m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
 #endif
   }
+  ///
+  __host__ __device__
+  ReduceSum(const ReduceSum<cuda_reduce_atomic<BLOCK_SIZE, Async>, T> &&other)
+  {
+    *this = other;
+#if defined(__CUDA_ARCH__)
+    // m_is_copy_device = true;
+    // m_finish_reduction = !other.m_is_copy_device;
+#else
+    m_is_copy_host = true;
+#endif
+  }
+
+  __host__ __device__
+  ReduceSum<cuda_reduce_atomic<BLOCK_SIZE, Async>, T> & operator=(const ReduceSum<cuda_reduce_atomic<BLOCK_SIZE, Async>, T> &other) = default;
 
   /*!
    * \brief Finish reduction on device and free memory on host.
@@ -1068,6 +1128,21 @@ public:
                                (sizeof(T) + sizeof(Index_type)));
 #endif
   }
+  ///
+  __host__ __device__
+  ReduceMinLoc(const ReduceMinLoc<cuda_reduce<BLOCK_SIZE, Async>, T> &&other)
+  {
+    *this = other;
+#if defined(__CUDA_ARCH__)
+    // m_is_copy_device = true;
+    // m_finish_reduction = !other.m_is_copy_device;
+#else
+    m_is_copy_host = true;
+#endif
+  }
+
+  __host__ __device__
+  ReduceMinLoc<cuda_reduce<BLOCK_SIZE, Async>, T> & operator=(const ReduceMinLoc<cuda_reduce<BLOCK_SIZE, Async>, T> &other) = default;
 
   /*!
    * \brief Finish reduction on device and free memory on host.
@@ -1381,6 +1456,21 @@ public:
                                (sizeof(T) + sizeof(Index_type)));
 #endif
   }
+  ///
+  __host__ __device__
+  ReduceMaxLoc(const ReduceMaxLoc<cuda_reduce<BLOCK_SIZE, Async>, T> &&other)
+  {
+    *this = other;
+#if defined(__CUDA_ARCH__)
+    // m_is_copy_device = true;
+    // m_finish_reduction = !other.m_is_copy_device;
+#else
+    m_is_copy_host = true;
+#endif
+  }
+
+  __host__ __device__
+  ReduceMaxLoc<cuda_reduce<BLOCK_SIZE, Async>, T> & operator=(const ReduceMaxLoc<cuda_reduce<BLOCK_SIZE, Async>, T> &other) = default;
 
   /*!
    * \brief Finish reduction on device and free memory on host.
