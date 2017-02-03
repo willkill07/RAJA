@@ -22,7 +22,7 @@
 //
 // This file is part of RAJA.
 //
-// For additional details, please also read raja/README-license.txt.
+// For additional details, please also read RAJA/LICENSE.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
@@ -54,6 +54,8 @@
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
 #include "RAJA/LegacyCompatibility.hxx"
+
+#include "RAJA/internal/defines.hxx"
 
 #ifdef RAJA_ENABLE_CUDA
 #include "RAJA/exec-cuda/MemUtils_CUDA.hxx"
@@ -146,9 +148,10 @@ struct ForallN_BindFirstArg_Host {
   }
 };
 
-template <typename NextExec, typename BODY>
+template <typename NextExec, typename BODY_in>
 struct ForallN_PeelOuter {
   NextExec const next_exec;
+  using BODY = typename std::remove_reference<BODY_in>::type;
   BODY const body;
 
   RAJA_INLINE
@@ -182,7 +185,7 @@ struct ForallN_PeelOuter {
   }
 };
 
-template <typename... PREST>
+template <typename... POLICY_REST>
 struct ForallN_Executor {
 };
 
@@ -192,18 +195,18 @@ struct ForallN_Executor {
  *  The default action is to call RAJA::forall to peel off outer loop nest.
  */
 
-template <typename PI, typename... PREST>
-struct ForallN_Executor<PI, PREST...> {
-  typedef typename PI::ISET TI;
-  typedef typename PI::POLICY POLICY_I;
+template <typename POLICY_INIT, typename... POLICY_REST>
+struct ForallN_Executor<POLICY_INIT, POLICY_REST...> {
+  typedef typename POLICY_INIT::ISET TYPE_I;
+  typedef typename POLICY_INIT::POLICY POLICY_I;
 
-  typedef ForallN_Executor<PREST...> NextExec;
+  typedef ForallN_Executor<POLICY_REST...> NextExec;
 
-  PI const is_i;
+  POLICY_INIT const is_i;
   NextExec const next_exec;
 
-  template <typename... TREST>
-  constexpr ForallN_Executor(PI const &is_i0, TREST const &... is_rest)
+  template <typename... TYPE_REST>
+  constexpr ForallN_Executor(POLICY_INIT const &is_i0, TYPE_REST const &... is_rest)
       : is_i(is_i0), next_exec(is_rest...)
   {
   }
@@ -279,13 +282,7 @@ struct ForallN_IndexTypeConverter {
     body(Idx(arg)...);
   }
 
-// This fixes massive compile time slowness for clang sans OpenMP
-// using a reference to body breaks offload for CUDA
-#ifdef RAJA_ENABLE_CUDA
   BODY body;
-#else
-  BODY const &body;
-#endif
 };
 
 template <typename POLICY,
@@ -314,10 +311,13 @@ RAJA_INLINE void forallN_impl_extract(RAJA::ExecList<ExecPolicies...>,
                                            args)...);
 }
 
-template <typename T, typename T2>
-T return_first(T a, T2 b)
-{
-  return a;
+namespace detail {
+
+template<typename T, size_t Unused>
+struct type_repeater {
+    using type=T;
+};
+
 }
 
 template <typename POLICY,
@@ -337,7 +337,7 @@ RAJA_INLINE void forallN_impl(VarOps::index_sequence<Range...>,
   // Make it look like variadics can have defaults
   forallN_impl_extract<POLICY,
                        Indices...,
-                       decltype(return_first((Index_type)0, Unspecified))...>(
+                       typename detail::type_repeater<Index_type, Unspecified>::type...>(
       typename POLICY::ExecPolicies(), body, args...);
 }
 
