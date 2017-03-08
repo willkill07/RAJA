@@ -202,6 +202,65 @@ struct CudaReductionTallyType {
 /*!
  ******************************************************************************
  *
+ * \brief Type used to simplify hold tally value in cuda atomic reductions.
+ *
+ * Must fit within the dummy tally type (checked in static assert in the
+ * reduction classes).
+ *
+ ******************************************************************************
+ */
+template <typename T>
+struct CudaReductionTallyTypeAtomic {
+  T tally;
+};
+
+/*!
+ ******************************************************************************
+ *
+ * \brief Type used to simplify hold tally value in cuda Loc reductions.
+ *
+ * Must fit within the dummy tally type (checked in static assert in the
+ * reduction classes).
+ *
+ * Note: Retired blocks is used to count the number of blocks that finished
+ * and wrote their portion of the reduction to the memory block.
+ *
+ ******************************************************************************
+ */
+template <typename T>
+struct CudaReductionLocTallyType {
+  CudaReductionLocType<T> tally;
+  GridSizeType retiredBlocks;
+};
+
+
+/*!
+ ******************************************************************************
+ *
+ * \brief Get the number of active cuda reducer objects.
+ *
+ * \return int number of active cuda reducer objects.
+ *
+ ******************************************************************************
+ */
+int getCudaReducerActiveCount();
+
+/*!
+ ******************************************************************************
+ *
+ * \brief Get the number of active cuda memblocks.
+ *
+ * \return int number of active cuda memblocks.
+ *
+ * note: getCudaMemblockUsedCount() is the number of active non-atomic reducers
+ *
+ ******************************************************************************
+ */
+int getCudaMemblockUsedCount();
+
+/*!
+ ******************************************************************************
+ *
  * \brief Get a valid reduction id, or complain and exit if no valid id is 
  *        available.
  *
