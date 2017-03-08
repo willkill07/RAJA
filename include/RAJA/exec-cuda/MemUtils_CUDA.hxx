@@ -273,13 +273,15 @@ int getCudaMemblockUsedCount();
  *
  ******************************************************************************
  */
-int getCudaReductionId_impl(void** host_val, void** init_dev_val);
+int getCudaReductionId();
+///
+int getCudaReductionId_hostdevice_impl(void** host_val, void** init_dev_val);
 ///
 template < typename T >
-int getCudaReductionId(T init_val_host, T init_val_device, void** host_val)
+int getCudaReductionId_hostdevice(T init_val_host, T init_val_device, void** host_val)
 {
   void* init_dev_val;
-  int id = getCudaReductionId_impl(host_val, &init_dev_val);
+  int id = getCudaReductionId_hostdevice_impl(host_val, &init_dev_val);
   ((T**)host_val)[0][0] = init_val_host;
   ((T*)init_dev_val)[0] = init_val_device;
   return id;
@@ -311,14 +313,16 @@ void releaseCudaReductionId(int id);
  *
  ******************************************************************************
  */
-CudaReductionDummyDataType* getCudaReductionTallyBlock_impl(
+void getCudaReductionTallyBlock(int id, void** host_tally, void** device_tally);
+///
+CudaReductionDummyDataType* getCudaReductionTallyBlock_hostdevice_impl(
                           int id, void** host_tally, void** device_tally);
 ///
 template < typename T >
-void getCudaReductionTallyBlock(int id, void** host_tally, void** device_tally)
+void getCudaReductionTallyBlock_hostdevice(int id, void** host_tally, void** device_tally)
 {
   CudaReductionDummyDataType* init_val_device = 
-      getCudaReductionTallyBlock_impl(id, host_tally, device_tally);
+      getCudaReductionTallyBlock_hostdevice_impl(id, host_tally, device_tally);
   if (init_val_device != nullptr) {
     ((CudaReductionTallyType<T>**)host_tally)[0][0].tally = ((T*)init_val_device)[0];
   }

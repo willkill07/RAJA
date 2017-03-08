@@ -134,7 +134,7 @@ public:
   explicit ReduceMin(T init_val)
   {
     m_is_copy_host = false;
-    m_myID = getCudaReductionId<T>(init_val, init_val, (void**)&m_reduced_val_host);
+    m_myID = getCudaReductionId_hostdevice<T>(init_val, init_val, (void**)&m_reduced_val_host);
   }
 
   /*!
@@ -172,7 +172,7 @@ public:
     __syncthreads();
 #else
     m_is_copy_host = true;
-    getCudaReductionTallyBlock<T>(m_myID,
+    getCudaReductionTallyBlock_hostdevice<T>(m_myID,
                                (void **)&m_tally_host,
                                (void **)&m_tally_device);
     m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
@@ -349,7 +349,7 @@ public:
   explicit ReduceMax(T init_val)
   {
     m_is_copy_host = false;
-    m_myID = getCudaReductionId<T>(init_val, init_val, (void**)&m_reduced_val_host);
+    m_myID = getCudaReductionId_hostdevice<T>(init_val, init_val, (void**)&m_reduced_val_host);
   }
 
   /*!
@@ -388,7 +388,7 @@ public:
     __syncthreads();
 #else
     m_is_copy_host = true;
-    getCudaReductionTallyBlock<T>(m_myID,
+    getCudaReductionTallyBlock_hostdevice<T>(m_myID,
                                (void **)&m_tally_host,
                                (void **)&m_tally_device);
     m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
@@ -565,7 +565,7 @@ public:
   explicit ReduceSum(T init_val)
   {
     m_is_copy_host = false;
-    m_myID = getCudaReductionId<T>(init_val, static_cast<T>(0), (void**)&m_reduced_val_host);
+    m_myID = getCudaReductionId_hostdevice<T>(init_val, static_cast<T>(0), (void**)&m_reduced_val_host);
   }
 
   /*!
@@ -605,7 +605,7 @@ public:
 #else
     m_is_copy_host = true;
     getCudaReductionMemBlock(m_myID, (void **)&m_blockdata);
-    getCudaReductionTallyBlock<T>(m_myID,
+    getCudaReductionTallyBlock_hostdevice<T>(m_myID,
                                   (void **)&m_tally_host,
                                   (void **)&m_tally_device);
     m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
@@ -840,7 +840,7 @@ public:
   explicit ReduceSum(T init_val)
   {
     m_is_copy_host = false;
-    m_myID = getCudaReductionId<T>(init_val, static_cast<T>(0), (void**)&m_reduced_val_host);
+    m_myID = getCudaReductionId_hostdevice<T>(init_val, static_cast<T>(0), (void**)&m_reduced_val_host);
   }
 
   /*!
@@ -879,7 +879,7 @@ public:
     __syncthreads();
 #else
     m_is_copy_host = true;
-    getCudaReductionTallyBlock<T>(m_myID,
+    getCudaReductionTallyBlock_hostdevice<T>(m_myID,
                                   (void **)&m_tally_host,
                                   (void **)&m_tally_device);
     m_smem_offset = getCudaSharedmemOffset(m_myID, BLOCK_SIZE, sizeof(T));
@@ -1064,7 +1064,7 @@ public:
   {
     m_is_copy_host = false;
     CudaReductionLocType<T> init_valloc {init_val, init_loc};
-    m_myID = getCudaReductionId<CudaReductionLocType<T>>(init_valloc, init_valloc, (void**)&m_reduced_val_host);
+    m_myID = getCudaReductionId_hostdevice<CudaReductionLocType<T>>(init_valloc, init_valloc, (void**)&m_reduced_val_host);
   }
 
   /*!
@@ -1109,7 +1109,7 @@ public:
 #else
     m_is_copy_host = true;
     getCudaReductionMemBlock(m_myID, (void **)&m_blockdata);
-    getCudaReductionTallyBlock<CudaReductionLocType<T>>(m_myID,
+    getCudaReductionTallyBlock_hostdevice<CudaReductionLocType<T>>(m_myID,
                                   (void **)&m_tally_host,
                                   (void **)&m_tally_device);
     m_smem_offset =
@@ -1414,7 +1414,7 @@ public:
   {
     m_is_copy_host = false;
     CudaReductionLocType<T> init_valloc {init_val, init_loc};
-    m_myID = getCudaReductionId<CudaReductionLocType<T>>
+    m_myID = getCudaReductionId_hostdevice<CudaReductionLocType<T>>
                       (init_valloc, init_valloc, (void**)&m_reduced_val_host);
   }
 
@@ -1460,7 +1460,7 @@ public:
 #else
     m_is_copy_host = true;
     getCudaReductionMemBlock(m_myID, (void **)&m_blockdata);
-    getCudaReductionTallyBlock<CudaReductionLocType<T>>(m_myID,
+    getCudaReductionTallyBlock_hostdevice<CudaReductionLocType<T>>(m_myID,
                                (void **)&m_tally_host,
                                (void **)&m_tally_device);
     m_smem_offset =
