@@ -164,7 +164,11 @@ const int COHERENCE_BLOCK_SIZE = @RAJA_COHERENCE_BLOCK_SIZE@;
 //
 
 #if defined(RAJA_COMPILER_GNU)
+#if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 8)
 #define RAJA_ALIGNED_ATTR(N) __attribute__((aligned(N)))
+#else
+#define RAJA_ALIGNED_ATTR(N) alignas(N)
+#endif
 #else
 #define RAJA_ALIGNED_ATTR(N) alignas(N)
 #endif
