@@ -24,6 +24,9 @@ protected:
     in_array = (RAJA::Real_ptr) RAJA::allocate_aligned(RAJA::DATA_ALIGN,
                    array_length * sizeof(RAJA::Real_type));
 
+#pragma omp target enter data map(to:test_array[0:array_length])
+#pragma omp target enter data map(to:in_array[0:array_length])
+
     for (RAJA::Index_type i = 0; i < array_length; ++i) {
       in_array[i] = RAJA::Real_type(rand() % 65536);
     }
@@ -41,6 +44,8 @@ protected:
 
   virtual void TearDown()
   {
+#pragma omp target exit data map(release: test_array[0:array_length])
+#pragma omp target exit data map(release: in_array[0:array_length])
     RAJA::free_aligned(test_array);
     RAJA::free_aligned(ref_array);
     RAJA::free_aligned(in_array);
@@ -55,12 +60,13 @@ protected:
 };
 
 TYPED_TEST_CASE_P(TraversalTest);
-
 TYPED_TEST_P(TraversalTest, BasicForall)
 {
   RAJA::forall<TypeParam>(this->index_sets_[0], [=](RAJA::Index_type idx) {
     this->test_array[idx] = this->in_array[idx] * this->in_array[idx];
   });
+
+#pragma omp target update from(this->test_array[0:this->array_length])
 
   for (int i = 0; i < this->array_length; ++i) {
     EXPECT_EQ(this->ref_array[i], this->test_array[i])
@@ -71,22 +77,18 @@ TYPED_TEST_P(TraversalTest, BasicForall)
 REGISTER_TYPED_TEST_CASE_P(TraversalTest, BasicForall);
 
 
-typedef ::testing::
-    Types<RAJA::IndexSet::ExecPolicy<RAJA::seq_segit, RAJA::seq_exec>,
-          RAJA::IndexSet::ExecPolicy<RAJA::seq_segit, RAJA::simd_exec> >
-        SequentialTypes;
-
-INSTANTIATE_TYPED_TEST_CASE_P(Sequential, TraversalTest, SequentialTypes);
+// typedef ::testing::
+//     Types<RAJA::IndexSet::ExecPolicy<RAJA::seq_segit, RAJA::seq_exec>,
+//           RAJA::IndexSet::ExecPolicy<RAJA::seq_segit, RAJA::simd_exec> >
+//         SequentialTypes;
+//
+// INSTANTIATE_TYPED_TEST_CASE_P(Sequential, TraversalTest, SequentialTypes);
 
 
 #if defined(RAJA_ENABLE_OPENMP)
 typedef ::testing::
     Types<RAJA::IndexSet::ExecPolicy<RAJA::seq_segit,
-                                     RAJA::omp_parallel_for_exec>,
-          RAJA::IndexSet::ExecPolicy<RAJA::omp_parallel_for_segit,
-                                     RAJA::seq_exec>,
-          RAJA::IndexSet::ExecPolicy<RAJA::omp_parallel_for_segit,
-                                     RAJA::simd_exec> >
+                                     RAJA::omp_target_parallel_for_exec> >
         OpenMPTypes;
 
 INSTANTIATE_TYPED_TEST_CASE_P(OpenMP, TraversalTest, OpenMPTypes);
