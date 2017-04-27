@@ -73,10 +73,12 @@ namespace RAJA
  *
  * Yes, this uses the curiously-recurring template pattern.
  */
-template <typename TYPE>
+template <typename Tag>
 class IndexValue
 {
+  using TYPE = IndexValue<Tag>;
 public:
+  using IndexValueType = IndexValue<Tag>;
   /*!
    * \brief Default constructor initializes value to 0.
    */
@@ -91,6 +93,10 @@ public:
   RAJA_HOST_DEVICE
   RAJA_INLINE
   constexpr explicit IndexValue(Index_type v) : value(v) {}
+
+  RAJA_HOST_DEVICE
+  RAJA_INLINE
+  void operator=(Index_type v) { value = v; }
 
   /*!
    * \brief Dereference provides cast-to-integer.
@@ -255,9 +261,7 @@ public:
   RAJA_HOST_DEVICE
   RAJA_INLINE bool operator!=(TYPE x) const { return (value != x.value); }
 
-  // This is not implemented... but should be by the derived type
-  // this is done by the macro
-  static std::string getName(void);
+  static inline std::string getName(void) { return Tag::getName(); }
 
 protected:
   Index_type value;
@@ -298,18 +302,24 @@ RAJA_HOST_DEVICE RAJA_INLINE TO convertIndex(FROM val)
  * \brief Helper Macro to create new Index types.
  */
 #define RAJA_INDEX_VALUE(TYPE, NAME)                                           \
-  class TYPE : public RAJA::IndexValue<TYPE>                                   \
-  {                                                                            \
-  public:                                                                      \
-    typedef TYPE IndexValueType; \
-    RAJA_HOST_DEVICE RAJA_INLINE TYPE() : RAJA::IndexValue<TYPE>::IndexValue() \
-    {                                                                          \
-    }                                                                          \
-    RAJA_HOST_DEVICE RAJA_INLINE explicit TYPE(RAJA::Index_type v)             \
-        : RAJA::IndexValue<TYPE>::IndexValue(v)                                \
-    {                                                                          \
-    }                                                                          \
-    static inline std::string getName(void) { return NAME; }                   \
-  };
+  struct TYPE ## _tag { \
+      static constexpr const char * getName() { \
+          return NAME; \
+      } \
+  }; \
+  using TYPE = RAJA::IndexValue<TYPE ## _tag>;
+
+namespace std{
+    template<typename Tag>
+    struct numeric_limits<RAJA::IndexValue<Tag>> {
+        using T = RAJA::IndexValue<Tag>;
+        static constexpr size_t max() {
+            return std::numeric_limits<RAJA::Index_type>::max();
+        }
+        static constexpr size_t min() {
+            return std::numeric_limits<RAJA::Index_type>::min();
+        }
+    };
+};
 
 #endif

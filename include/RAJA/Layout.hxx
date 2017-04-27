@@ -61,7 +61,6 @@
 
 namespace RAJA
 {
-
 template <typename Range, typename IdxLin = Index_type>
 struct LayoutBase_impl { };
 
@@ -88,7 +87,7 @@ public:
   RAJA_INLINE RAJA_HOST_DEVICE LayoutBase_impl(Types... ns)
   : sizes{convertIndex<IdxLin>(ns)...}
   {
-    static_assert(n_dims == sizeof ... (Types), "number of dimensions must match");
+    // static_assert(n_dims == sizeof ... (Types), "number of dimensions must match");
     for (size_t i = 0; i < n_dims; i++) {
       strides[i] = 1;
       for (size_t j = 0; j < i; j++) {
@@ -138,6 +137,28 @@ constexpr size_t LayoutBase_impl<VarOps::index_sequence<RangeInts...>, IdxLin>::
 
 template <size_t n_dims, typename IdxLin = Index_type>
 using Layout = LayoutBase_impl<VarOps::make_index_sequence<n_dims>, IdxLin>;
+
+template <typename IdxLin, typename...IndexTypes>
+class TypedLayout {
+  Layout<sizeof...(IndexTypes), Index_type> layout;
+
+  public:
+  using IndexLinear = IdxLin;
+
+  template <typename... Types>
+  constexpr
+  TypedLayout(Types...ns) : layout{ns...} {}
+
+  template <typename... Types>
+  constexpr
+  TypedLayout(const decltype(layout) & l) : layout{l} {}
+
+  template<typename... Indices>
+  RAJA_INLINE RAJA_HOST_DEVICE constexpr IdxLin operator()(Indices... indices) const
+  {
+    return IdxLin{layout(Index_type{*indices}...)};
+  }
+};
 
 
 }  // namespace RAJA

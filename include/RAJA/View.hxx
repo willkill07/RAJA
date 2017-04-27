@@ -85,6 +85,13 @@ struct View {
   {
     return data[convertIndex<Index_type>(layout(args...))];
   }
+
+  template <typename... Args>
+  RAJA_HOST_DEVICE RAJA_INLINE 
+      typename LayoutT::IndexLinear index(Args... args) const
+  {
+    return layout(args...);
+  }
 };
 
 template <typename DataType, typename LayoutT, typename... IndexTypes>
@@ -111,6 +118,12 @@ struct TypedView {
   RAJA_HOST_DEVICE RAJA_INLINE DataType &operator()(IndexTypes... args) const
   {
     return base_.operator()(convertIndex<Index_type>(args)...);
+  }
+
+  RAJA_HOST_DEVICE RAJA_INLINE 
+      typename LayoutT::IndexLinear index(IndexTypes... args) const
+  {
+    return base_.layout(convertIndex<Index_type>(args)...);
   }
 };
 
